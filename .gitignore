@@ -2,5 +2,6 @@
 __pycache__/
 .venv/
 
-# Accounts database
+# Accounts database, cache
 var/accounts.db
+var/cache/

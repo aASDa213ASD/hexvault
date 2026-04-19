@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from io import BytesIO
-from urllib.request import Request, urlopen
+from pathlib import Path
 
-from PIL import Image as PILImageModule
 from rich_pixels import Pixels
 from textual.widget import Widget
+
+from src.ui.image_cache import ensure_cached_image
+
+_PIXELS_CACHE: dict[tuple[str, tuple[int, int] | None], Pixels] = {}
 
 
 class RemoteImage(Widget):
@@ -23,6 +25,7 @@ class RemoteImage(Widget):
         self.resize = resize
         self.loading_text = loading_text
         self.empty_text = empty_text
+        self._loaded_cache_key: tuple[str, tuple[int, int] | None] | None = None
         self._content: Pixels | str = empty_text if not image_url else loading_text
 
     def render(self) -> Pixels | str:
@@ -35,23 +38,61 @@ class RemoteImage(Widget):
         self.image_url = image_url
 
         if not image_url:
+            self._loaded_cache_key = None
             self._content = self.empty_text
+            self.refresh()
+            return
+
+        cache_key = (image_url, self.resize)
+        cached_pixels = _PIXELS_CACHE.get(cache_key)
+        if cached_pixels is not None:
+            self._loaded_cache_key = cache_key
+            self._content = cached_pixels
             self.refresh()
             return
 
         self._content = self.loading_text
 
         try:
-            request = Request(
-                image_url,
-                headers={"User-Agent": "Hexvault/1.0"},
-            )
-            with urlopen(request, timeout=10) as response:
-                image_bytes = response.read()
-
-            with PILImageModule.open(BytesIO(image_bytes)) as image:
-                self._content = Pixels.from_image(image, resize=self.resize)
+            cache_path = ensure_cached_image(image_url, self.resize)
+            if cache_path is not None:
+                self._set_from_path(cache_path, cache_key)
+            else:
+                self._content = self.empty_text
         except Exception as exc:  # noqa: BLE001
             self._content = f"Failed to load image: {exc}"
 
         self.refresh()
+
+    def load_from_path(self, image_path: str | Path | None) -> None:
+        if not image_path:
+            self._loaded_cache_key = None
+            self._content = self.empty_text
+            self.refresh()
+            return
+
+        path = Path(image_path)
+        cache_key = (str(path.resolve()), self.resize)
+        cached_pixels = _PIXELS_CACHE.get(cache_key)
+        if cached_pixels is not None:
+            self._loaded_cache_key = cache_key
+            self._content = cached_pixels
+            self.refresh()
+            return
+
+        try:
+            self._set_from_path(path, cache_key)
+        except Exception as exc:  # noqa: BLE001
+            self._content = f"Failed to load image: {exc}"
+
+        self.refresh()
+
+    def _set_from_path(
+        self,
+        image_path: str | Path,
+        cache_key: tuple[str, tuple[int, int] | None],
+    ) -> None:
+        pixels = Pixels.from_image_path(image_path, resize=self.resize)
+        _PIXELS_CACHE[cache_key] = pixels
+        self._loaded_cache_key = cache_key
+        self._content = pixels

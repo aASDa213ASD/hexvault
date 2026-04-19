@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import (
@@ -13,10 +15,15 @@ from textual.widgets import (
 )
 
 from src.database.connection import init_db
+from src.ui.image_cache import prewarm_images
 from src.ui.widgets.remote_image import RemoteImage
 from src.usecases.accounts import list_accounts
 from src.usecases.health import health
 from src.usecases.lcu import get_auto_accept_status
+
+ICON_SIZE = (16, 16)
+RANK_ICON_SIZE = (16, 16)
+RANKS_DIR = Path(__file__).resolve().parent / "resources" / "ranks"
 
 
 class Hexvault(App):
@@ -36,14 +43,49 @@ class Hexvault(App):
     }
 
     #accounts-sidebar {
-        width: 28;
-        min-width: 28;
+        width: 48;
+        min-width: 48;
         padding-left: 1;
     }
 
-    #account-icon {
-        width: 12;
+    #details-hero {
         height: auto;
+    }
+
+    #summoner-panel {
+        width: 1fr;
+    }
+
+    #rank-panel {
+        width: 1fr;
+    }
+
+    #summoner-title {
+        text-style: bold;
+    }
+
+    #rank-title {
+        text-style: bold;
+    }
+
+    #rank-row {
+        height: auto;
+    }
+
+    #account-icon {
+        width: 20;
+        height: auto;
+    }
+
+    #rank-icon {
+        width: 16;
+        height: auto;
+    }
+
+    #rank-text {
+        width: 1fr;
+        content-align-vertical: middle;
+        text-wrap: nowrap;
     }
 
     #account-summary {
@@ -63,11 +105,22 @@ class Hexvault(App):
                         yield DataTable(id="accounts-table")
                         with Vertical(id="accounts-sidebar"):
                             yield Static("Account details", classes="section-title")
-                            yield RemoteImage(
-                                resize=(10, 10),
-                                empty_text="No icon available",
-                                id="account-icon",
-                            )
+                            with Horizontal(id="details-hero"):
+                                with Vertical(id="summoner-panel"):
+                                    yield Static("-", id="summoner-title")
+                                    yield RemoteImage(
+                                        resize=ICON_SIZE,
+                                        empty_text="No icon available",
+                                        id="account-icon",
+                                    )
+                                with Vertical(id="rank-panel"):
+                                    yield Static("-", id="rank-text")
+                                    with Horizontal(id="rank-row"):
+                                        yield RemoteImage(
+                                            resize=RANK_ICON_SIZE,
+                                            empty_text="",
+                                            id="rank-icon",
+                                        )
                             yield Static("No account selected", id="account-summary")
             with TabPane("LCU", id="lcu"):
                 with Vertical():
@@ -104,6 +157,16 @@ class Hexvault(App):
             self.query_one("#account-summary", Static).update("No accounts found")
             table.add_row("-", "No accounts found", "-", "-", "-", "-")
             return
+
+        prewarm_images(
+            [
+                summoner.get("icon_url")
+                for account in self._accounts
+                for summoner in [account.get("summoner") or {}]
+                if summoner.get("icon_url")
+            ],
+            resize=ICON_SIZE,
+        )
 
         for account in self._accounts:
             summoner = account.get("summoner") or {}
@@ -153,13 +216,19 @@ class Hexvault(App):
         self.query_one("#account-icon", RemoteImage).load_from_url(
             summoner.get("icon_url")
         )
+        self.query_one("#summoner-title", Static).update(
+            self._format_summoner_name(summoner)
+        )
+        self.query_one("#rank-icon", RemoteImage).load_from_path(
+            self._get_rank_icon_path(primary_queue.get("tier"))
+        )
+        #self.query_one("#rank-title", Static).update(primary_queue.get("type") or "Rank")
+        self.query_one("#rank-text", Static).update(rank_label)
         self.query_one("#account-summary", Static).update(
             "\n".join(
                 [
-                    f"Summoner: {self._format_summoner_name(summoner)}",
                     f"Region: {summoner.get('region') or '-'}",
                     f"Level: {summoner.get('level') or '-'}",
-                    f"Rank: {rank_label}",
                     f"Blue Essence: {loot.get('blue_essence') or '-'}",
                     f"RP: {loot.get('riot_points') or '-'}",
                     f"Champions: {len((collection.get('champions') or []))}",
@@ -169,6 +238,14 @@ class Hexvault(App):
                 ]
             )
         )
+
+    def _get_rank_icon_path(self, tier: str | None) -> Path | None:
+        rank_name = (tier or "UNRANKED").strip().lower()
+        rank_path = RANKS_DIR / f"{rank_name}.png"
+        if rank_path.exists():
+            return rank_path
+        fallback_path = RANKS_DIR / "unranked.png"
+        return fallback_path if fallback_path.exists() else None
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if event.cursor_row < 0 or event.cursor_row >= len(self._accounts):
