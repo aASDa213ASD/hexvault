@@ -14,6 +14,11 @@ from textual.widgets import (
     TabPane,
 )
 
+from src.ui.anonymization import (
+    fake_rank_for_account,
+    fake_region_for_summoner,
+    fake_username_for_summoner,
+)
 from src.ui.widgets.remote_image import RemoteImage
 
 ICON_SIZE = (16, 16)
@@ -29,11 +34,10 @@ class AccountDetailScreen(Screen[None]):
     #detail-hero {
         min-height: 10;
         max-height: 10;
-        margin-bottom: 1;
     }
 
     #detail-account-icon {
-        width: 18;
+        width: 16;
         height: auto;
         margin-right: 2;
     }
@@ -54,7 +58,6 @@ class AccountDetailScreen(Screen[None]):
 
     .overview-row {
         max-height: 1;
-        margin-bottom: 1;
     }
 
     .overview-label {
@@ -68,9 +71,18 @@ class AccountDetailScreen(Screen[None]):
     }
     """
 
-    def __init__(self, account: dict) -> None:
+    def __init__(
+        self,
+        account: dict,
+        hide_names: bool = False,
+        hide_regions: bool = False,
+        randomize_ranks: bool = False,
+    ) -> None:
         super().__init__()
         self.account = account
+        self.hide_names = hide_names
+        self.hide_regions = hide_regions
+        self.randomize_ranks = randomize_ranks
 
     def compose(self) -> ComposeResult:
         summoner = self.account.get("summoner") or {}
@@ -87,9 +99,10 @@ class AccountDetailScreen(Screen[None]):
                 with Vertical():
                     yield Static(self._format_summoner_name(summoner), id="detail-title")
                     yield Static(
-                        f"{summoner.get('region') or '-'}  Level {summoner.get('level') or '-'}",
+                        f"{self._format_region(summoner)}  Level {summoner.get('level') or '-'}",
                         classes="muted",
                     )
+                    yield Rule()
                     yield Static(self._primary_rank_label())
                     yield Static(
                         "  ".join(
@@ -149,10 +162,9 @@ class AccountDetailScreen(Screen[None]):
             verified = "verified" if verification.get("is_email_verified") else "unverified"
             email_value = f"{email_value} ({verified})"
         yield self._overview_row("Account ID", str(self.account.get("id", "-")))
-        yield self._overview_row("Region", summoner.get("region") or "-")
+        yield self._overview_row("Region", self._format_region(summoner))
         yield self._overview_row("Level", str(summoner.get("level") or "-"))
         yield self._overview_row("Email", email_value)
-        yield self._overview_row("Login", credentials.get("login") or "-")
 
     def _compose_overview_currencies(self) -> ComposeResult:
         loot = self.account.get("loot") or {}
@@ -170,12 +182,20 @@ class AccountDetailScreen(Screen[None]):
     def _compose_overview_ranked(self) -> ComposeResult:
         ranked_queues = self._ranked_queues()
         if not ranked_queues:
-            yield self._overview_row("Queues", "No ranked data")
+            if self.randomize_ranks:
+                fake_rank, fake_tier = fake_rank_for_account(self.account, "primary")
+                yield self._overview_row("Queues", f"{fake_rank} {fake_tier}")
+            else:
+                yield self._overview_row("Queues", "No ranked data")
             return
-        for queue in ranked_queues:
+        for index, queue in enumerate(ranked_queues):
             tier = queue.get("tier") or "UNRANKED"
             division = queue.get("division")
             label = f"{tier} {division}" if division else tier
+            if self.randomize_ranks:
+                queue_key = str(queue.get("type") or f"queue-{index}")
+                fake_rank, fake_tier = fake_rank_for_account(self.account, queue_key)
+                label = f"{fake_rank} {fake_tier}"
             summary = (
                 f"{label}, {queue.get('league_points', 0)} LP, "
                 f"{queue.get('wins', 0)}W/{queue.get('losses', 0)}L"
@@ -245,6 +265,13 @@ class AccountDetailScreen(Screen[None]):
 
     def _primary_rank_label(self) -> str:
         ranked_queues = self._ranked_queues()
+        if self.randomize_ranks:
+            queue_key = str((ranked_queues[0] if ranked_queues else {}).get("type") or "primary")
+            fake_rank, fake_tier = fake_rank_for_account(self.account, queue_key)
+            if not ranked_queues:
+                return f"{fake_rank} {fake_tier}"
+            queue_type = ranked_queues[0].get("type") or "Rank"
+            return f"{queue_type}  {fake_rank} {fake_tier}"
         if not ranked_queues:
             return "UNRANKED"
         queue = ranked_queues[0]
@@ -255,11 +282,18 @@ class AccountDetailScreen(Screen[None]):
         return f"{queue_type}  {label}"
 
     def _format_summoner_name(self, summoner: dict) -> str:
+        if self.hide_names:
+            return fake_username_for_summoner(summoner)
         name = summoner.get("name")
         tag = summoner.get("tag")
         if name and tag:
             return f"{name}#{tag}"
         return name or "-"
+
+    def _format_region(self, summoner: dict) -> str:
+        if self.hide_regions:
+            return fake_region_for_summoner(summoner)
+        return summoner.get("region") or "-"
 
     def _filtered_champions(self) -> list[dict]:
         champions = (self.account.get("collection") or {}).get("champions") or []

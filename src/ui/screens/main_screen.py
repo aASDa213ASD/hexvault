@@ -7,6 +7,11 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Checkbox, DataTable, Footer, Static, TabbedContent, TabPane
 
 from src.database.connection import init_db
+from src.ui.anonymization import (
+    fake_rank_for_account,
+    fake_region_for_summoner,
+    fake_username_for_summoner,
+)
 from src.ui.image_cache import prewarm_images
 from src.ui.screens.account_detail import AccountDetailScreen
 from src.ui.widgets.remote_image import RemoteImage
@@ -123,7 +128,6 @@ class Hexvault(App):
                         classes="section-title",
                     )
                     yield Checkbox("Hide names", id="setting-hide-names", compact=True)
-                    yield Checkbox("Hide tags", id="setting-hide-tags", compact=True)
                     yield Checkbox("Hide regions", id="setting-hide-regions", compact=True)
                     yield Checkbox(
                         "Randomize ranks",
@@ -141,6 +145,7 @@ class Hexvault(App):
 
     def _populate_accounts_table(self) -> None:
         table = self.query_one("#accounts-table", DataTable)
+        table.clear(columns=True)
         table.cursor_type = "row"
         table.add_columns("ID", "Summoner", "Region", "Level", "Rank", "Blue Essence")
 
@@ -164,19 +169,12 @@ class Hexvault(App):
         for account in self._accounts:
             summoner = account.get("summoner") or {}
             loot = account.get("loot") or {}
-            rank = account.get("rank") or {}
-            ranked_queues = rank.get("ranked_queues") or []
-
-            primary_queue = ranked_queues[0] if ranked_queues else {}
-            rank_label = primary_queue.get("tier") or "UNRANKED"
-            division = primary_queue.get("division")
-            if division:
-                rank_label = f"{rank_label} {division}"
+            rank_label = self._format_primary_rank_label(account)
 
             table.add_row(
                 str(account.get("id", "")),
                 self._format_summoner_name(summoner),
-                summoner.get("region") or "-",
+                self._format_region(summoner),
                 str(summoner.get("level") or "-"),
                 rank_label,
                 str(loot.get("blue_essence") or "-"),
@@ -185,24 +183,62 @@ class Hexvault(App):
         self._show_account_details(self._accounts[0])
 
     def _format_summoner_name(self, summoner: dict) -> str:
+        if self._is_hide_names_enabled():
+            return fake_username_for_summoner(summoner)
         name = summoner.get("name")
         tag = summoner.get("tag")
         if name and tag:
             return f"{name}#{tag}"
         return name or "-"
 
-    def _show_account_details(self, account: dict) -> None:
-        summoner = account.get("summoner") or {}
-        loot = account.get("loot") or {}
-        collection = account.get("collection") or {}
+    def _is_hide_names_enabled(self) -> bool:
+        return self.query_one("#setting-hide-names", Checkbox).value
+
+    def _is_hide_regions_enabled(self) -> bool:
+        return self.query_one("#setting-hide-regions", Checkbox).value
+
+    def _is_randomize_ranks_enabled(self) -> bool:
+        return self.query_one("#setting-randomize-ranks", Checkbox).value
+
+    def _format_region(self, summoner: dict) -> str:
+        if self._is_hide_regions_enabled():
+            return fake_region_for_summoner(summoner)
+        return summoner.get("region") or "-"
+
+    def _format_primary_rank_label(self, account: dict) -> str:
         rank = account.get("rank") or {}
         ranked_queues = rank.get("ranked_queues") or []
-
         primary_queue = ranked_queues[0] if ranked_queues else {}
+        if self._is_randomize_ranks_enabled():
+            fake_rank, fake_tier = fake_rank_for_account(
+                account,
+                queue_key=str(primary_queue.get("type") or "primary"),
+            )
+            return f"{fake_rank} {fake_tier}"
+
         rank_label = primary_queue.get("tier") or "UNRANKED"
         division = primary_queue.get("division")
         if division:
             rank_label = f"{rank_label} {division}"
+        return rank_label
+
+    def _primary_rank_icon_tier(self, account: dict) -> str | None:
+        rank = account.get("rank") or {}
+        ranked_queues = rank.get("ranked_queues") or []
+        primary_queue = ranked_queues[0] if ranked_queues else {}
+        if self._is_randomize_ranks_enabled():
+            fake_rank, _ = fake_rank_for_account(
+                account,
+                queue_key=str(primary_queue.get("type") or "primary"),
+            )
+            return fake_rank
+        return primary_queue.get("tier")
+
+    def _show_account_details(self, account: dict) -> None:
+        summoner = account.get("summoner") or {}
+        loot = account.get("loot") or {}
+        collection = account.get("collection") or {}
+        rank_label = self._format_primary_rank_label(account)
 
         self.query_one("#account-icon", RemoteImage).load_from_url(
             summoner.get("icon_url")
@@ -211,13 +247,13 @@ class Hexvault(App):
             self._format_summoner_name(summoner)
         )
         self.query_one("#rank-icon", RemoteImage).load_from_path(
-            self._get_rank_icon_path(primary_queue.get("tier"))
+            self._get_rank_icon_path(self._primary_rank_icon_tier(account))
         )
         self.query_one("#rank-text", Static).update(rank_label)
         self.query_one("#account-summary", Static).update(
             "\n".join(
                 [
-                    f"Region: {summoner.get('region') or '-'}",
+                    f"Region: {self._format_region(summoner)}",
                     f"Level: {summoner.get('level') or '-'}",
                     f"Blue Essence: {loot.get('blue_essence') or '-'}",
                     f"RP: {loot.get('riot_points') or '-'}",
@@ -243,7 +279,26 @@ class Hexvault(App):
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if event.cursor_row < 0 or event.cursor_row >= len(self._accounts):
             return
-        self.push_screen(AccountDetailScreen(self._accounts[event.cursor_row]))
+        self.push_screen(
+            AccountDetailScreen(
+                self._accounts[event.cursor_row],
+                hide_names=self._is_hide_names_enabled(),
+                hide_regions=self._is_hide_regions_enabled(),
+                randomize_ranks=self._is_randomize_ranks_enabled(),
+            )
+        )
+
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if event.checkbox.id not in {
+            "setting-hide-names",
+            "setting-hide-regions",
+            "setting-randomize-ranks",
+        }:
+            return
+        selected_row = self.query_one("#accounts-table", DataTable).cursor_row
+        self._populate_accounts_table()
+        if 0 <= selected_row < len(self._accounts):
+            self._show_account_details(self._accounts[selected_row])
 
     def _populate_lcu_status(self) -> None:
         status = get_auto_accept_status()
@@ -261,7 +316,7 @@ class Hexvault(App):
         for name, result in status.items():
             ok = result.get("ok")
             error = result.get("error")
-            line = f"{name}: {'ok' if ok else 'failed'}"
+            line = f"{name.upper()}: {'OPERATIONAL' if ok else 'FATAL'}"
             if error:
                 line = f"{line} ({error})"
             lines.append(line)
