@@ -1,0 +1,6 @@
+# Python garbage
+__pycache__/
+.venv/
+
+# Accounts database
+var/accounts.db
