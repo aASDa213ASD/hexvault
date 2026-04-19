@@ -4,6 +4,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import (
+    Button,
     DataTable,
     Footer,
     Header,
@@ -69,6 +70,12 @@ class AccountDetailScreen(Screen[None]):
         width: 1fr;
         text-style: bold;
     }
+
+    #overview-copy-actions {
+        margin-top: 1;
+        margin-bottom: 1;
+        max-height: 1;
+    }
     """
 
     def __init__(
@@ -118,6 +125,11 @@ class AccountDetailScreen(Screen[None]):
             with TabbedContent(initial="overview"):
                 with TabPane("Overview", id="overview"):
                     with Vertical():
+                        with Horizontal(id="overview-copy-actions"):
+                            yield Button("Login", id="copy-login", compact=True)
+                            yield Button("Password", id="copy-password", compact=True)
+                            yield Button("IDs", id="copy-ids", compact=True)
+                        yield Static("", id="detail-copy-status", classes="muted")
                         yield Static("Profile", classes="overview-section-title")
                         yield Rule()
                         yield from self._compose_overview_profile()
@@ -328,3 +340,55 @@ class AccountDetailScreen(Screen[None]):
 
     def action_close_screen(self) -> None:
         self.app.pop_screen()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        credentials = self.account.get("credentials") or {}
+        summoner = self.account.get("summoner") or {}
+        copy_value = ""
+        success_label = ""
+
+        if event.button.id == "copy-login":
+            copy_value = str(credentials.get("login") or "")
+            success_label = "Login"
+        elif event.button.id == "copy-password":
+            copy_value = str(credentials.get("password") or "")
+            success_label = "Password"
+        elif event.button.id == "copy-ids":
+            ids = [
+                f"account_id: {str(summoner.get("summoner_account_id") or "-")}",
+                f"summoner_id: {str(summoner.get("summoner_id") or "-")}",
+                f"puuid: {str(summoner.get("puuid") or "-")}",
+            ]
+            copy_value = "\n".join(ids)
+            success_label = "IDs"
+        else:
+            return
+
+        if not copy_value:
+            self.query_one("#detail-copy-status", Static).update(
+                f"{success_label} is empty"
+            )
+            return
+
+        if self._copy_to_clipboard(copy_value):
+            self.query_one("#detail-copy-status", Static).update(
+                f"{success_label} copied to clipboard"
+            )
+        else:
+            self.query_one("#detail-copy-status", Static).update(
+                "Clipboard copy failed on this system"
+            )
+
+    def _copy_to_clipboard(self, value: str) -> bool:
+        app_copy = getattr(self.app, "copy_to_clipboard", None)
+        if callable(app_copy):
+            app_copy(value)
+            return True
+
+        try:
+            import pyperclip  # type: ignore
+
+            pyperclip.copy(value)
+            return True
+        except Exception:
+            return False
