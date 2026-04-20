@@ -4,9 +4,10 @@ from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Checkbox, DataTable, Footer, Static, TabbedContent, TabPane
+from textual.widgets import Button, Checkbox, DataTable, Footer, Static, TabbedContent, TabPane
 
 from src.database.connection import init_db
+from src.lcu.client import get_current_summoner
 from src.ui.anonymization import (
     fake_rank_for_account,
     fake_region_for_summoner,
@@ -17,7 +18,12 @@ from src.ui.screens.account_detail import AccountDetailScreen
 from src.ui.widgets.remote_image import RemoteImage
 from src.usecases.accounts import list_accounts
 from src.usecases.health import health
-from src.usecases.lcu import get_auto_accept_status
+from src.usecases.lcu import (
+    current_account_exists,
+    get_auto_accept_status,
+    get_current_account_from_lcu,
+    save_current_account,
+)
 
 ICON_SIZE = (16, 16)
 RANK_ICON_SIZE = (16, 16)
@@ -112,8 +118,9 @@ class Hexvault(App):
                             yield Static("No account selected", id="account-summary")
             with TabPane("LCU", id="lcu"):
                 with Vertical():
-                    yield Static("LCU", classes="section-title")
+                    yield Static("League Client API Handler", classes="section-title")
                     yield Static(id="lcu-status")
+                    yield Button("Sync from client", id="lcu-sync", compact=True)
             with TabPane("Health", id="health"):
                 with Vertical():
                     yield Static(
@@ -301,14 +308,45 @@ class Hexvault(App):
             self._show_account_details(self._accounts[selected_row])
 
     def _populate_lcu_status(self) -> None:
-        status = get_auto_accept_status()
+        # status = get_auto_accept_status()
+        summoner = get_current_summoner()
+        if not summoner:
+            return
+        
         lines = [
-            f"running: {status.get('running')}",
-            f"last_state: {status.get('last_state') or '-'}",
-            f"accepted_count: {status.get('accepted_count')}",
-            f"last_error: {status.get('last_error') or '-'}",
+            f"Connected to {summoner.get('name')}#{summoner.get('tag')}"
         ]
         self.query_one("#lcu-status", Static).update("\n".join(lines))
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id != "lcu-sync":
+            return
+        try:
+            current = get_current_account_from_lcu()
+            exists = current_account_exists().get("exists", False)
+            result = save_current_account(overwrite=bool(exists))
+            summoner = current.get("summoner") or {}
+            name = self._format_summoner_name(summoner)
+            sync_status = (
+                f"sync: overwritten account '{name}'"
+                if exists
+                else f"sync: saved account '{name}'"
+            )
+            self._populate_accounts_table()
+            self._populate_health_status()
+            summoner = get_current_summoner()
+            lines = [
+                f"Connected to {summoner.get('name')}#{summoner.get('tag')}",
+                sync_status
+            ]
+            self.query_one("#lcu-status", Static).update("\n".join(lines))
+        except Exception as exc:
+            summoner = get_current_summoner()
+            lines = [
+                f"Connected to {summoner.get('name')}#{summoner.get('tag')}",
+                f"fatal: {exc}",
+            ]
+            self.query_one("#lcu-status", Static).update("\n".join(lines))
 
     def _populate_health_status(self) -> None:
         status = health()

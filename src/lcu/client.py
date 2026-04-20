@@ -241,6 +241,24 @@ def get_current_account() -> dict | None:
         "loot": loot,
     }
 
+def get_current_summoner() -> dict | None:
+    config = _read_lockfile()
+    if not config:
+        return None
+
+    current = _request(config, Endpoint.CURRENT_SUMMONER)
+    if not current:
+        return None
+
+    summoner = {
+        "name": current.get("gameName"),
+        "tag": current.get("tagLine"),
+        "level": current.get("summonerLevel"),
+        "icon_id": current.get("profileIconId"),
+        "icon_url": get_icon_url(current.get("profileIconId")),
+    }
+
+    return summoner
 
 def _build_collection(config: LcuConfig) -> dict:
     champions = []

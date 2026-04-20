@@ -53,8 +53,7 @@ class AccountDetailScreen(Screen[None]):
     }
 
     .overview-section-title {
-        margin-top: 2;
-        margin-bottom: 1;
+        margin-top: 1;
     }
 
     .overview-row {
@@ -75,6 +74,7 @@ class AccountDetailScreen(Screen[None]):
         margin-top: 1;
         margin-bottom: 1;
         max-height: 1;
+        min-height: 1;
     }
     """
 
@@ -129,6 +129,7 @@ class AccountDetailScreen(Screen[None]):
                             yield Button("Login", id="copy-login", compact=True)
                             yield Button("Password", id="copy-password", compact=True)
                             yield Button("IDs", id="copy-ids", compact=True)
+                            yield Button("OP.GG", id="copy-opgg", compact=True)
                         yield Static("", id="detail-copy-status", classes="muted")
                         yield Static("Profile", classes="overview-section-title")
                         yield Rule()
@@ -355,12 +356,19 @@ class AccountDetailScreen(Screen[None]):
             success_label = "Password"
         elif event.button.id == "copy-ids":
             ids = [
-                f"account_id: {str(summoner.get("summoner_account_id") or "-")}",
-                f"summoner_id: {str(summoner.get("summoner_id") or "-")}",
-                f"puuid: {str(summoner.get("puuid") or "-")}",
+                f"account_id: {str(summoner.get('summoner_account_id') or '-')}",
+                f"summoner_id: {str(summoner.get('summoner_id') or '-')}",
+                f"puuid: {str(summoner.get('puuid') or '-')}",
             ]
             copy_value = "\n".join(ids)
             success_label = "IDs"
+        elif event.button.id == "copy-opgg":
+            name = str(summoner.get("name") or "").strip()
+            tag = str(summoner.get("tag") or "").strip()
+            region = str(summoner.get("region") or "").strip()
+            if name and tag:
+                copy_value = f"https://www.leagueofgraphs.com/summoner/{region}/{name}-{tag}"
+            success_label = "OP.GG"
         else:
             return
 
