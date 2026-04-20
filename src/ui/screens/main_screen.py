@@ -121,6 +121,7 @@ class Hexvault(App):
                 with Vertical():
                     yield Static("League Client API Handler", classes="section-title")
                     yield Static(id="lcu-status")
+                    yield Static("")
                     yield Button("Sync from client", id="lcu-sync", compact=True)
             with TabPane("Health", id="health"):
                 with Vertical():
@@ -293,8 +294,13 @@ class Hexvault(App):
                 hide_names=self._is_hide_names_enabled(),
                 hide_regions=self._is_hide_regions_enabled(),
                 randomize_ranks=self._is_randomize_ranks_enabled(),
-            )
+            ),
+            callback=self._on_account_detail_closed,
         )
+
+    def _on_account_detail_closed(self, was_deleted: bool | None) -> None:
+        if was_deleted:
+            self._populate_accounts_table()
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         if event.checkbox.id not in {
@@ -315,7 +321,7 @@ class Hexvault(App):
             return
         
         lines = [
-            f"Connected to {summoner.get('name')}#{summoner.get('tag')}"
+            f"Connected to '{summoner.get('name')}#{summoner.get('tag')}'"
         ]
         self.query_one("#lcu-status", Static).update("\n".join(lines))
 

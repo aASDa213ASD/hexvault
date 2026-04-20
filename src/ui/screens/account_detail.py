@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.screen import Screen
+from textual.screen import ModalScreen, Screen
 from textual.widgets import (
     Button,
     DataTable,
     Footer,
-    Header,
     Input,
     Rule,
     Static,
@@ -21,12 +20,56 @@ from src.ui.anonymization import (
     fake_username_for_summoner,
 )
 from src.ui.widgets.remote_image import RemoteImage
+from src.usecases.accounts import delete_account
 
 ICON_SIZE = (16, 16)
 
 
-class AccountDetailScreen(Screen[None]):
-    BINDINGS = [("escape", "close_screen", "Back"), ("q", "close_screen", "Back")]
+class ConfirmAccountRemovalScreen(ModalScreen[bool]):
+    CSS = """
+    ConfirmAccountRemovalScreen {
+        align: center middle;
+    }
+
+    #confirm-remove-dialog {
+        width: 70;
+        max-height: 10;
+        padding: 1 2;
+        border: round $surface;
+    }
+
+    #confirm-remove-title {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+
+    #confirm-remove-actions {
+        margin-top: 1;
+        align-horizontal: right;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="confirm-remove-dialog"):
+            yield Static("Forget this account?", id="confirm-remove-title")
+            yield Static("This account will be permanently removed and this action is irreversable. Continue anyway?")
+            with Horizontal(id="confirm-remove-actions"):
+                yield Button("Cancel", id="remove-cancel", compact=True)
+                yield Button("Proceed", id="remove-confirm", variant="error", compact=True)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "remove-confirm":
+            self.dismiss(True)
+            return
+        self.dismiss(False)
+
+
+class AccountDetailScreen(Screen[bool | None]):
+    BINDINGS = [
+        ("escape", "close_screen", "back"),
+        ("q", "close_screen", "back"),
+        ("r", "remove_account", "forget account"),
+    ]
     CSS = """
     #detail-root {
         padding: 1 2;
@@ -76,6 +119,7 @@ class AccountDetailScreen(Screen[None]):
         max-height: 1;
         min-height: 1;
     }
+
     """
 
     def __init__(
@@ -340,7 +384,13 @@ class AccountDetailScreen(Screen[None]):
             self._populate_skins_table()
 
     def action_close_screen(self) -> None:
-        self.app.pop_screen()
+        self.dismiss(None)
+
+    def action_remove_account(self) -> None:
+        self.app.push_screen(
+            ConfirmAccountRemovalScreen(),
+            callback=self._on_remove_confirmation,
+        )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         credentials = self.account.get("credentials") or {}
@@ -385,6 +435,25 @@ class AccountDetailScreen(Screen[None]):
         else:
             self.query_one("#detail-copy-status", Static).update(
                 "Clipboard copy failed on this system"
+            )
+
+    def _on_remove_confirmation(self, confirmed: bool) -> None:
+        if not confirmed:
+            return
+
+        account_id = self.account.get("id")
+        if not isinstance(account_id, int):
+            self.query_one("#detail-copy-status", Static).update(
+                "Failed to remove account: invalid account id"
+            )
+            return
+
+        try:
+            delete_account(account_id)
+            self.dismiss(True)
+        except Exception as exc:
+            self.query_one("#detail-copy-status", Static).update(
+                f"Failed to remove account: {exc}"
             )
 
     def _copy_to_clipboard(self, value: str) -> bool:

@@ -14,7 +14,7 @@ class AccountCredentialsScreen(ModalScreen[tuple[str, str] | None]):
 
     #credentials-dialog {
         width: 64;
-        height: auto;
+        max-height: 12;
         padding: 1 2;
         border: round $surface;
     }
@@ -31,7 +31,6 @@ class AccountCredentialsScreen(ModalScreen[tuple[str, str] | None]):
     }
 
     #credentials-actions {
-        margin-top: 1;
         align-horizontal: right;
     }
     """
