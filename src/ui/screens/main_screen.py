@@ -14,6 +14,7 @@ from src.ui.anonymization import (
     fake_username_for_summoner,
 )
 from src.ui.image_cache import prewarm_images
+from src.ui.screens.account_credentials import AccountCredentialsScreen
 from src.ui.screens.account_detail import AccountDetailScreen
 from src.ui.widgets.remote_image import RemoteImage
 from src.usecases.accounts import list_accounts
@@ -321,10 +322,22 @@ class Hexvault(App):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id != "lcu-sync":
             return
+        self._sync_current_account()
+
+    def _sync_current_account(self) -> None:
         try:
             current = get_current_account_from_lcu()
             exists = current_account_exists().get("exists", False)
-            result = save_current_account(overwrite=bool(exists))
+            if not exists:
+                self.push_screen(
+                    AccountCredentialsScreen(),
+                    callback=lambda credentials: self._save_new_account_with_credentials(
+                        current, credentials
+                    ),
+                )
+                return
+
+            save_current_account(overwrite=True)
             summoner = current.get("summoner") or {}
             name = self._format_summoner_name(summoner)
             sync_status = (
@@ -342,6 +355,39 @@ class Hexvault(App):
             self.query_one("#lcu-status", Static).update("\n".join(lines))
         except Exception as exc:
             summoner = get_current_summoner()
+            lines = [
+                f"Connected to {summoner.get('name')}#{summoner.get('tag')}",
+                f"fatal: {exc}",
+            ]
+            self.query_one("#lcu-status", Static).update("\n".join(lines))
+
+    def _save_new_account_with_credentials(
+        self,
+        current: dict,
+        credentials: tuple[str, str] | None,
+    ) -> None:
+        summoner = current.get("summoner") or {}
+        if credentials is None:
+            lines = [
+                f"Connected to {summoner.get('name')}#{summoner.get('tag')}",
+                "sync: canceled",
+            ]
+            self.query_one("#lcu-status", Static).update("\n".join(lines))
+            return
+
+        login, password = credentials
+        try:
+            save_current_account(login=login, password=password, overwrite=False)
+            name = self._format_summoner_name(summoner)
+            sync_status = f"sync: saved account '{name}'"
+            self._populate_accounts_table()
+            self._populate_health_status()
+            lines = [
+                f"Connected to {summoner.get('name')}#{summoner.get('tag')}",
+                sync_status,
+            ]
+            self.query_one("#lcu-status", Static).update("\n".join(lines))
+        except Exception as exc:
             lines = [
                 f"Connected to {summoner.get('name')}#{summoner.get('tag')}",
                 f"fatal: {exc}",
