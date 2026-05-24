@@ -18,6 +18,9 @@ from src.datadragon.client import (
 )
 from src.lcu.endpoints import Endpoint
 
+PLACEHOLDER_ACCOUNT_IMAGE_URL = (
+    "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/rewards/honor/milestone/images/honor_background_5.png"
+)
 
 @dataclass
 class LcuConfig:
@@ -233,7 +236,7 @@ def get_current_account() -> dict | None:
     loot = _build_loot(config)
 
     return {
-        "account_image_url": "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/rewards/honor/milestone/images/honor_background_5.png",
+        "account_image_url": PLACEHOLDER_ACCOUNT_IMAGE_URL,
         "summoner": summoner,
         "verification": verification,
         "rank": {"ranked_queues": queues} if queues else None,
