@@ -417,7 +417,7 @@ class AccountDetailScreen(Screen[bool | None]):
             tag = str(summoner.get("tag") or "").strip()
             region = str(summoner.get("region") or "").strip()
             if name and tag:
-                copy_value = f"https://www.leagueofgraphs.com/summoner/{region}/{name}-{tag}"
+                copy_value = f"https://dpm.lol/{name}-{tag}"
             success_label = "OP.GG"
         else:
             return

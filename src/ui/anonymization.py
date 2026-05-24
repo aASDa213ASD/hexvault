@@ -16,7 +16,7 @@ _RANK_WEIGHTS = {
     "EMERALD": 20,
     "DIAMOND": 50,
     "MASTER": 30,
-    "GRANDMASTER": 25,
+    "GRANDMASTER": 1,
     "CHALLENGER": 1,
 }
 _RANK_TIERS = ("I", "II", "III", "IV")
