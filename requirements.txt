@@ -2,6 +2,6 @@ SQLAlchemy>=2.0.50
 Faker>=40.19.1
 dotenv>=0.9.9
 textual>=8.2.7
-paperclip>=1.11.0
+pyperclip>=1.11.0
 pillow>=12.2.0
 rich-pixels>=3.0.1

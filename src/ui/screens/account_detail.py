@@ -457,15 +457,5 @@ class AccountDetailScreen(Screen[bool | None]):
             )
 
     def _copy_to_clipboard(self, value: str) -> bool:
-        app_copy = getattr(self.app, "copy_to_clipboard", None)
-        if callable(app_copy):
-            app_copy(value)
-            return True
-
-        try:
-            import pyperclip  # type: ignore
-
-            pyperclip.copy(value)
-            return True
-        except Exception:
-            return False
+        import pyperclip  # type: ignore
+        pyperclip.copy(value)
