@@ -5,3 +5,7 @@ __pycache__/
 # Accounts database, cache
 var/accounts.db
 var/cache/
+
+# Environment
+.env*
+!.env.example
