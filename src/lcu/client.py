@@ -21,6 +21,12 @@ from src.lcu.endpoints import Endpoint
 PLACEHOLDER_ACCOUNT_IMAGE_URL = (
     "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/rewards/honor/milestone/images/honor_background_5.png"
 )
+APEX_RANK_TIERS = {
+    "MASTER",
+    "GRANDMASTER",
+    "CHALLENGER"
+}
+
 
 @dataclass
 class LcuConfig:
@@ -48,12 +54,14 @@ def _read_lockfile() -> LcuConfig | None:
 def _request(config: LcuConfig, path: str) -> Any:
     if hasattr(path, "value"):
         path = path.value
+
     auth = base64.b64encode(f"riot:{config.password}".encode("utf-8")).decode("ascii")
     req = urllib.request.Request(
         url=f"{config.base_url}{path}",
         headers={"Authorization": f"Basic {auth}"},
     )
     context = ssl._create_unverified_context()
+
     try:
         with urllib.request.urlopen(req, context=context, timeout=2) as response:
             data = response.read()
@@ -69,18 +77,21 @@ def _request_json(
 ) -> tuple[int | None, Any]:
     if hasattr(path, "value"):
         path = path.value
+
     auth = base64.b64encode(f"riot:{config.password}".encode("utf-8")).decode("ascii")
     headers = {"Authorization": f"Basic {auth}"}
     body = None
     if payload is not None:
         headers["Content-Type"] = "application/json"
         body = json.dumps(payload).encode("utf-8")
+    
     req = urllib.request.Request(
         url=f"{config.base_url}{path}",
         headers=headers,
         data=body,
         method=method.upper(),
     )
+
     context = ssl._create_unverified_context()
     try:
         with urllib.request.urlopen(req, context=context, timeout=2) as response:
@@ -101,6 +112,26 @@ def _request_json(
         return None, None
 
 
+def _parse_rank_tier(value: str | None) -> str:
+    return (value or "UNRANKED").strip().title()
+
+
+def _parse_rank_division(tier: str, value: str | None) -> str | None:
+    normalized_tier = tier.strip().upper()
+    normalized_value = (value or "").strip().upper()
+    
+    if normalized_tier == "UNRANKED":
+        return None
+    
+    if normalized_tier in APEX_RANK_TIERS:
+        return "I"
+    
+    if not normalized_value or normalized_value == "NA":
+        return None
+    
+    return normalized_value
+
+
 def clear_challenges_preferences() -> dict | None:
     config = _read_lockfile()
     if not config:
@@ -114,7 +145,12 @@ def clear_challenges_preferences() -> dict | None:
     )
     if status is None:
         return None
-    return {"status": status, "ok": status in (200, 201, 204), "payload": payload}
+    
+    return {
+        "status": status,
+        "ok": status in (200, 201, 204),
+        "payload": payload
+    }
 
 
 def set_current_summoner_icon(profile_icon_id: int) -> dict | None:
@@ -130,16 +166,23 @@ def set_current_summoner_icon(profile_icon_id: int) -> dict | None:
     )
     if status is None:
         return None
-    return {"status": status, "ok": status in (200, 201, 204), "payload": payload}
+
+    return {
+        "status": status,
+        "ok": status in (200, 201, 204),
+        "payload": payload
+    }
 
 
 def get_matchmaking_search_state() -> str | None:
     config = _read_lockfile()
     if not config:
         return None
+    
     payload = _request(config, Endpoint.MATCHMAKING_SEARCH_STATE)
     if not isinstance(payload, dict):
         return None
+    
     value = payload.get("searchState")
     return value if isinstance(value, str) else None
 
@@ -164,7 +207,12 @@ def accept_ready_check() -> dict | None:
     )
     if status is None:
         return None
-    return {"status": status, "ok": status in (200, 201, 204), "payload": payload}
+
+    return {
+        "status": status,
+        "ok": status in (200, 201, 204),
+        "payload": payload
+    }
 
 
 def dodge_champ_select() -> dict | None:
@@ -180,7 +228,11 @@ def dodge_champ_select() -> dict | None:
     )
     if status is None:
         return None
-    return {"status": status, "ok": status in (200, 201, 204), "payload": payload}
+    return {
+        "status": status,
+        "ok": status in (200, 201, 204),
+        "payload": payload
+    }
 
 
 def get_current_account() -> dict | None:
@@ -219,12 +271,13 @@ def get_current_account() -> dict | None:
     if queue_map:
         for queue_type in ("RANKED_SOLO_5x5", "RANKED_FLEX_SR"):
             data = queue_map.get(queue_type, {})
-            tier = data.get("tier") or "UNRANKED"
+            tier = _parse_rank_tier(data.get("tier"))
+            division = _parse_rank_division(tier, data.get("division"))
             queues.append(
                 {
                     "type": queue_type,
                     "tier": tier,
-                    "division": data.get("division"),
+                    "division": division,
                     "league_points": data.get("leaguePoints", 0),
                     "wins": data.get("wins", 0),
                     "losses": data.get("losses", 0),

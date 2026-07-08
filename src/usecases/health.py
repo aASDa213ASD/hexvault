@@ -29,7 +29,7 @@ def check_database() -> dict:
 
 def health() -> dict:
     return {
-        "communitydragon": check_communitydragon(),
-        "lcu": check_lcu(),
-        "database": check_database(),
+        "COMMUNITY_DRAGON": check_communitydragon(),
+        "LCU": check_lcu(),
+        "DB": check_database(),
     }

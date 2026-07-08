@@ -65,5 +65,5 @@ def fake_rank_for_account(account: dict, queue_key: str = "primary") -> tuple[st
     weights = list(_RANK_WEIGHTS.values())
     rank = rng.choices(ranks, weights=weights, k=1)[0]
     if rank in _TIER_I_ONLY_RANKS:
-        return rank, "I"
-    return rank, rng.choice(_RANK_TIERS)
+        return rank.title(), "I"
+    return rank.title(), rng.choice(_RANK_TIERS)

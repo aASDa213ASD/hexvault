@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, Checkbox, DataTable, Footer, Static, TabbedContent, TabPane
@@ -16,6 +17,13 @@ from src.ui.anonymization import (
 from src.ui.image_cache import prewarm_images
 from src.ui.screens.account_credentials import AccountCredentialsScreen
 from src.ui.screens.account_detail import AccountDetailScreen
+from src.ui.theme import (
+    HEXVAULT_CSS,
+    HEXVAULT_THEME,
+    ICON_SIZE,
+    RANK_COLORS,
+    RANK_ICON_SIZE,
+)
 from src.ui.widgets.remote_image import RemoteImage
 from src.usecases.accounts import list_accounts
 from src.usecases.health import health
@@ -26,126 +34,164 @@ from src.usecases.lcu import (
     save_current_account,
 )
 
-ICON_SIZE = (16, 16)
-RANK_ICON_SIZE = (16, 16)
 RANKS_DIR = Path(__file__).resolve().parents[3] / "resources" / "ranks"
 
 
 class Hexvault(App):
     BINDINGS = [("q", "quit", "Quit")]
-    CSS = """
-    .section-title {
-        margin-bottom: 1;
-        text-style: bold;
-    }
-
-    #accounts-layout {
-        height: 1fr;
-    }
-
-    #accounts-table {
-        width: 2fr;
-    }
-
-    #accounts-sidebar {
-        width: 44;
-        min-width: 44;
-        padding-left: 3;
-    }
-
-    #details-hero {
-        max-height: 10;
-    }
-
-    #summoner-title {
-        text-style: bold;
-    }
-
-    #rank-row {
-        height: auto;
-    }
-
-    #account-icon {
-        width: 20;
-        height: auto;
-    }
-
-    #rank-icon {
-        width: 16;
-        height: auto;
-    }
-
-    #rank-text {
-        width: 1fr;
-        padding-left: 1;
-        content-align-vertical: middle;
-        text-wrap: nowrap;
-    }
-
-    #account-summary {
-        margin-top: 1;
-    }
-
-    """
+    CSS = HEXVAULT_CSS
 
     def compose(self) -> ComposeResult:
-        with TabbedContent(initial="accounts"):
-            with TabPane("Accounts", id="accounts"):
-                with Vertical():
-                    yield Static(
-                        "A depiction of all possessions one man could collect over the years",
-                        classes="section-title",
-                    )
+        with Vertical(id="app-root"):
+            with TabbedContent(initial="accounts"):
+                with TabPane("Accounts", id="accounts"):
                     with Horizontal(id="accounts-layout"):
-                        yield DataTable(id="accounts-table")
-                        with VerticalScroll(id="accounts-sidebar"):
-                            yield Static("Account details", classes="section-title")
-                            with Horizontal(id="details-hero"):
-                                with Vertical(id="summoner-panel"):
-                                    yield Static("-", id="summoner-title")
-                                    yield RemoteImage(
-                                        resize=ICON_SIZE,
-                                        empty_text="No icon available",
-                                        id="account-icon",
-                                    )
-                                with Vertical(id="rank-panel"):
-                                    yield Static("-", id="rank-text")
-                                    with Horizontal(id="rank-row"):
+                        with Vertical(id="accounts-list-panel", classes="section") as panel:
+                            panel.border_title = "Vault"
+                            panel.border_subtitle = "Enter to open the account"
+                            yield DataTable(id="accounts-table")
+                        with Vertical(id="accounts-sidebar"):
+                            with VerticalScroll(id="selected-account-panel", classes="section") as panel:
+                                panel.border_title = "Selected account"
+                                panel.border_subtitle = "Live preview"
+                                with Horizontal(id="details-hero"):
+                                    with Vertical(id="summoner-panel") as panel:
+                                        panel.border_title = "-"
                                         yield RemoteImage(
-                                            resize=RANK_ICON_SIZE,
-                                            empty_text="",
-                                            id="rank-icon",
+                                            resize=ICON_SIZE,
+                                            empty_text="No icon available",
+                                            id="account-icon",
                                         )
-                            yield Static("No account selected", id="account-summary")
-            with TabPane("LCU", id="lcu"):
-                with Vertical():
-                    yield Static("League Client API Handler", classes="section-title")
-                    yield Static(id="lcu-status")
-                    yield Static("")
-                    yield Button("Sync from client", id="lcu-sync", compact=True)
-            with TabPane("Health", id="health"):
-                with Vertical():
-                    yield Static(
-                        "Status page for overall application health and it's dependencies",
-                        classes="section-title",
-                    )
-                    yield Static(id="health-status")
-            with TabPane("Settings", id="settings"):
-                with Vertical():
-                    yield Static(
-                        "Control how account details are displayed across the vault",
-                        classes="section-title",
-                    )
-                    yield Checkbox("Hide names", id="setting-hide-names", compact=True)
-                    yield Checkbox("Hide regions", id="setting-hide-regions", compact=True)
-                    yield Checkbox(
-                        "Randomize ranks",
-                        id="setting-randomize-ranks",
-                        compact=True,
-                    )
+                                    with Vertical(id="rank-panel") as panel:
+                                        panel.border_title = "-"
+                                        with Horizontal(id="rank-row"):
+                                            yield RemoteImage(
+                                                resize=RANK_ICON_SIZE,
+                                                empty_text="",
+                                                id="rank-icon",
+                                            )
+                                with Vertical(id="account-summary"):
+                                    with Horizontal(
+                                        classes="summary-block",
+                                        id="account-meta",
+                                    ) as account_meta:
+                                        account_meta.border_title = "Account"
+                                        with Horizontal(classes="summary-item"):
+                                            yield Static("Region", classes="summary-label")
+                                            yield Static("-", classes="summary-value", id="account-region")
+                                        with Horizontal(classes="summary-item right"):
+                                            yield Static("Level", classes="summary-label")
+                                            yield Static("-", classes="summary-value", id="account-level")
+                                    with Horizontal(
+                                        classes="summary-block",
+                                        id="currency-meta",
+                                    ) as currency_meta:
+                                        currency_meta.border_title = "Currency"
+                                        with Horizontal(classes="summary-item"):
+                                            yield Static("Blue Essence", classes="summary-label")
+                                            yield Static("-", classes="summary-value", id="blue-essence")
+                                        with Horizontal(classes="summary-item right"):
+                                            yield Static("Riot Points", classes="summary-label")
+                                            yield Static("-", classes="summary-value", id="riot-points")
+                                    with Horizontal(
+                                        classes="summary-block",
+                                        id="collection-meta",
+                                    ) as collection_meta:
+                                        collection_meta.border_title = "Collection"
+                                        with Horizontal(classes="summary-item"):
+                                            yield Static("Champions", classes="summary-label")
+                                            yield Static("-", classes="summary-value", id="champions-count")
+                                        with Horizontal(classes="summary-item right"):
+                                            yield Static("Skins", classes="summary-label")
+                                            yield Static("-", classes="summary-value", id="skins-count")
+                            with Vertical(id="connected-client", classes="section") as panel:
+                                panel.border_title = "Connected client"
+                                with Horizontal(id="client-hero"):
+                                    with Vertical(id="client-icon-panel") as panel:
+                                        yield RemoteImage(
+                                            resize=ICON_SIZE,
+                                            empty_text="No icon",
+                                            id="client-icon",
+                                        )
+                                    with Vertical(id="client-text-panel") as panel:
+                                        yield Static(
+                                            "Not connected",
+                                            id="lcu-status",
+                                            classes="client-status",
+                                        )
+                                        yield Static(
+                                            "",
+                                            id="lcu-sync-status",
+                                            classes="client-sync-status",
+                                        )
+                                
+                                with Horizontal(id="lcu-actions"):
+                                    yield Button(
+                                        "Sync",
+                                        id="lcu-sync",
+                                        classes="client-sync-button",
+                                    )
+                with TabPane("Client", id="lcu"):
+                    with Vertical(classes="section single-panel") as panel:
+                        panel.border_title = "League Client"
+                        panel.border_subtitle = "LCU API Interface"
+                        yield Static(
+                            "Not implemented",
+                        )
+                with TabPane("Settings", id="settings"):
+                    with Vertical(classes="section single-panel") as panel:
+                        panel.border_title = "Privacy"
+                        panel.border_subtitle = "Display controls"
+                        with Vertical(id="settings-options"):
+                            with Horizontal(classes="setting-row") as row:
+                                row.border_title = "Summoner names"
+                                with Vertical(classes="setting-copy"):
+                                    yield Static("Hide names", classes="setting-title")
+                                    yield Static(
+                                        "Replace Riot IDs with fake generated names",
+                                        classes="setting-description",
+                                    )
+                                yield Checkbox(
+                                    id="setting-hide-names",
+                                    compact=True,
+                                    classes="setting-toggle",
+                                )
+                            with Horizontal(classes="setting-row") as row:
+                                row.border_title = "Regions"
+                                with Vertical(classes="setting-copy"):
+                                    yield Static("Hide regions", classes="setting-title")
+                                    yield Static(
+                                        "Show generated server codes instead of real regions",
+                                        classes="setting-description",
+                                    )
+                                yield Checkbox(
+                                    id="setting-hide-regions",
+                                    compact=True,
+                                    classes="setting-toggle",
+                                )
+                            with Horizontal(classes="setting-row") as row:
+                                row.border_title = "Ranks"
+                                with Vertical(classes="setting-copy"):
+                                    yield Static("Randomize ranks", classes="setting-title")
+                                    yield Static(
+                                        "Display deterministic fake ranks to hide the fact that you are low elo",
+                                        classes="setting-description",
+                                    )
+                                yield Checkbox(
+                                    id="setting-randomize-ranks",
+                                    compact=True,
+                                    classes="setting-toggle",
+                                )
+                with TabPane("Health", id="health"):
+                    with Vertical(classes="section single-panel") as panel:
+                        panel.border_title = "Health"
+                        panel.border_subtitle = "Dependencies"
+                        yield Static(id="health-status", classes="status-copy")
         yield Footer()
 
     def on_mount(self) -> None:
+        self.register_theme(HEXVAULT_THEME)
+        self.theme = "hexvault"
         init_db()
         self._accounts: list[dict] = []
         self._populate_accounts_table()
@@ -161,7 +207,12 @@ class Hexvault(App):
         self._accounts = list_accounts()
         if not self._accounts:
             self.query_one("#account-icon", RemoteImage).load_from_url(None)
-            self.query_one("#account-summary", Static).update("No accounts found")
+            self.query_one("#account-region", Static).update("-")
+            self.query_one("#account-level", Static).update("-")
+            self.query_one("#blue-essence", Static).update("-")
+            self.query_one("#riot-points", Static).update("-")
+            self.query_one("#champions-count", Static).update("-")
+            self.query_one("#skins-count", Static).update("-")
             table.add_row("-", "No accounts found", "-", "-", "-", "-")
             return
 
@@ -178,15 +229,29 @@ class Hexvault(App):
         for account in self._accounts:
             summoner = account.get("summoner") or {}
             loot = account.get("loot") or {}
-            rank_label = self._format_primary_rank_label(account)
+            ranked_queues = (account.get("rank") or {}).get("ranked_queues") or []
+            primary_queue = ranked_queues[0] if ranked_queues else {}
+            if self._is_randomize_ranks_enabled():
+                fake_rank, fake_tier = fake_rank_for_account(
+                    account,
+                    queue_key=str(primary_queue.get("type") or "primary"),
+                )
+                rank_label = f"{fake_rank} {fake_tier}"
+                rank_tier = fake_rank
+            else:
+                rank_tier = primary_queue.get("tier") or "Unranked"
+                rank_label = rank_tier
+                division = primary_queue.get("division")
+                if division:
+                    rank_label = f"{rank_label} {division}"
 
             table.add_row(
-                str(account.get("id", "")),
-                self._format_summoner_name(summoner),
-                self._format_region(summoner),
-                str(summoner.get("level") or "-"),
-                rank_label,
-                str(loot.get("blue_essence") or "-"),
+                Text(str(account.get("id", "")), style="dim"),
+                Text(self._format_summoner_name(summoner), style="$primary"),
+                Text(self._format_region(summoner), style="dim"),
+                Text(str(summoner.get("level") or "-"), style="dim"),
+                Text(rank_label, style=RANK_COLORS.get(rank_tier, "")),
+                Text(str(loot.get("blue_essence") or "-"), style="#B2DCFF"),
             )
 
         self._show_account_details(self._accounts[0])
@@ -214,62 +279,45 @@ class Hexvault(App):
             return fake_region_for_summoner(summoner)
         return summoner.get("region") or "-"
 
-    def _format_primary_rank_label(self, account: dict) -> str:
-        rank = account.get("rank") or {}
-        ranked_queues = rank.get("ranked_queues") or []
+    def _show_account_details(self, account: dict) -> None:
+        summoner = account.get("summoner") or {}
+        loot = account.get("loot") or {}
+        collection = account.get("collection") or {}
+        ranked_queues = (account.get("rank") or {}).get("ranked_queues") or []
         primary_queue = ranked_queues[0] if ranked_queues else {}
+        rank_icon_tier = primary_queue.get("tier")
         if self._is_randomize_ranks_enabled():
             fake_rank, fake_tier = fake_rank_for_account(
                 account,
                 queue_key=str(primary_queue.get("type") or "primary"),
             )
-            return f"{fake_rank} {fake_tier}"
-
-        rank_label = primary_queue.get("tier") or "UNRANKED"
-        division = primary_queue.get("division")
-        if division:
-            rank_label = f"{rank_label} {division}"
-        return rank_label
-
-    def _primary_rank_icon_tier(self, account: dict) -> str | None:
-        rank = account.get("rank") or {}
-        ranked_queues = rank.get("ranked_queues") or []
-        primary_queue = ranked_queues[0] if ranked_queues else {}
-        if self._is_randomize_ranks_enabled():
-            fake_rank, _ = fake_rank_for_account(
-                account,
-                queue_key=str(primary_queue.get("type") or "primary"),
-            )
-            return fake_rank
-        return primary_queue.get("tier")
-
-    def _show_account_details(self, account: dict) -> None:
-        summoner = account.get("summoner") or {}
-        loot = account.get("loot") or {}
-        collection = account.get("collection") or {}
-        rank_label = self._format_primary_rank_label(account)
+            rank_label = f"{fake_rank} {fake_tier}"
+            rank_icon_tier = fake_rank
+        else:
+            rank_label = primary_queue.get("tier") or "UNRANKED"
+            division = primary_queue.get("division")
+            if division:
+                rank_label = f"{rank_label} {division}"
 
         self.query_one("#account-icon", RemoteImage).load_from_url(
             summoner.get("icon_url")
         )
-        self.query_one("#summoner-title", Static).update(
+        self.query_one("#summoner-panel", Vertical).border_title = (
             self._format_summoner_name(summoner)
         )
         self.query_one("#rank-icon", RemoteImage).load_from_path(
-            self._get_rank_icon_path(self._primary_rank_icon_tier(account))
+            self._get_rank_icon_path(rank_icon_tier)
         )
-        self.query_one("#rank-text", Static).update(rank_label)
-        self.query_one("#account-summary", Static).update(
-            "\n".join(
-                [
-                    f"Region: {self._format_region(summoner)}",
-                    f"Level: {summoner.get('level') or '-'}",
-                    f"Blue Essence: {loot.get('blue_essence') or '-'}",
-                    f"RP: {loot.get('riot_points') or '-'}",
-                    f"Champions: {len((collection.get('champions') or []))}",
-                    f"Skins: {len((collection.get('skins') or []))}",
-                ]
-            )
+        self.query_one("#rank-panel", Vertical).border_title = rank_label
+        self.query_one("#account-region", Static).update(self._format_region(summoner))
+        self.query_one("#account-level", Static).update(str(summoner.get("level") or "0"))
+        self.query_one("#blue-essence", Static).update(str(loot.get("blue_essence") or "0"))
+        self.query_one("#riot-points", Static).update(str(loot.get("riot_points") or "0"))
+        self.query_one("#champions-count", Static).update(
+            str(len((collection.get("champions") or [])))
+        )
+        self.query_one("#skins-count", Static).update(
+            str(len((collection.get("skins") or [])))
         )
 
     def _get_rank_icon_path(self, tier: str | None) -> Path | None:
@@ -318,12 +366,26 @@ class Hexvault(App):
         # status = get_auto_accept_status()
         summoner = get_current_summoner()
         if not summoner:
+            self.query_one("#client-icon", RemoteImage).load_from_url(None)
+            self.query_one("#lcu-status", Static).update("Not connected")
+            self.query_one("#lcu-sync-status", Static).update("")
             return
-        
-        lines = [
-            f"Connected to '{summoner.get('name')}#{summoner.get('tag')}'"
-        ]
-        self.query_one("#lcu-status", Static).update("\n".join(lines))
+
+        self.query_one("#client-icon", RemoteImage).load_from_url(
+            summoner.get("icon_url")
+        )
+        self._set_lcu_welcome(summoner)
+
+    def _set_lcu_welcome(self, summoner: dict | None) -> None:
+        if not summoner:
+            self.query_one("#lcu-status", Static).update("Not connected")
+            return
+        self.query_one("#lcu-status", Static).update(
+            f"Welcome back, {summoner.get('name')}#{summoner.get('tag')}"
+        )
+
+    def _set_lcu_sync_status(self, message: str) -> None:
+        self.query_one("#lcu-sync-status", Static).update(message)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id != "lcu-sync":
@@ -346,26 +408,22 @@ class Hexvault(App):
             save_current_account(overwrite=True)
             summoner = current.get("summoner") or {}
             name = self._format_summoner_name(summoner)
-            sync_status = (
-                f"sync: overwritten account '{name}'"
-                if exists
-                else f"sync: saved account '{name}'"
-            )
+            sync_status = f"Account synced - {name}"
             self._populate_accounts_table()
             self._populate_health_status()
             summoner = get_current_summoner()
-            lines = [
-                f"Connected to {summoner.get('name')}#{summoner.get('tag')}",
-                sync_status
-            ]
-            self.query_one("#lcu-status", Static).update("\n".join(lines))
+            self.query_one("#client-icon", RemoteImage).load_from_url(
+                summoner.get("icon_url") if summoner else None
+            )
+            self._set_lcu_welcome(summoner)
+            self._set_lcu_sync_status(sync_status)
         except Exception as exc:
             summoner = get_current_summoner()
-            lines = [
-                f"Connected to {summoner.get('name')}#{summoner.get('tag')}",
-                f"fatal: {exc}",
-            ]
-            self.query_one("#lcu-status", Static).update("\n".join(lines))
+            self.query_one("#client-icon", RemoteImage).load_from_url(
+                summoner.get("icon_url") if summoner else None
+            )
+            self._set_lcu_welcome(summoner)
+            self._set_lcu_sync_status(f"fatal: {exc}")
 
     def _save_new_account_with_credentials(
         self,
@@ -374,31 +432,31 @@ class Hexvault(App):
     ) -> None:
         summoner = current.get("summoner") or {}
         if credentials is None:
-            lines = [
-                f"Connected to {summoner.get('name')}#{summoner.get('tag')}",
-                "sync: canceled",
-            ]
-            self.query_one("#lcu-status", Static).update("\n".join(lines))
+            self.query_one("#client-icon", RemoteImage).load_from_url(
+                summoner.get("icon_url")
+            )
+            self._set_lcu_welcome(summoner)
+            self._set_lcu_sync_status("Sync has been cancelled")
             return
 
         login, password = credentials
         try:
             save_current_account(login=login, password=password, overwrite=False)
             name = self._format_summoner_name(summoner)
-            sync_status = f"sync: saved account '{name}'"
+            sync_status = f"Account added {name}"
             self._populate_accounts_table()
             self._populate_health_status()
-            lines = [
-                f"Connected to {summoner.get('name')}#{summoner.get('tag')}",
-                sync_status,
-            ]
-            self.query_one("#lcu-status", Static).update("\n".join(lines))
+            self.query_one("#client-icon", RemoteImage).load_from_url(
+                summoner.get("icon_url")
+            )
+            self._set_lcu_welcome(summoner)
+            self._set_lcu_sync_status(sync_status)
         except Exception as exc:
-            lines = [
-                f"Connected to {summoner.get('name')}#{summoner.get('tag')}",
-                f"fatal: {exc}",
-            ]
-            self.query_one("#lcu-status", Static).update("\n".join(lines))
+            self.query_one("#client-icon", RemoteImage).load_from_url(
+                summoner.get("icon_url")
+            )
+            self._set_lcu_welcome(summoner)
+            self._set_lcu_sync_status(f"fatal: {exc}")
 
     def _populate_health_status(self) -> None:
         status = health()
@@ -406,7 +464,7 @@ class Hexvault(App):
         for name, result in status.items():
             ok = result.get("ok")
             error = result.get("error")
-            line = f"{name.upper()}: {'OPERATIONAL' if ok else 'FATAL'}"
+            line = f"{name}: {'Operational' if ok else 'Fatal'}"
             if error:
                 line = f"{line} ({error})"
             lines.append(line)
