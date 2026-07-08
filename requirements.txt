@@ -5,3 +5,4 @@ textual>=8.2.7
 pyperclip>=1.11.0
 pillow>=12.2.0
 rich-pixels>=3.0.1
+rich>=15.0.0
