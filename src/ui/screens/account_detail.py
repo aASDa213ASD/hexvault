@@ -8,7 +8,6 @@ from textual.widgets import (
     DataTable,
     Footer,
     Input,
-    Rule,
     Static,
     TabbedContent,
     TabPane,
@@ -19,11 +18,11 @@ from src.ui.anonymization import (
     fake_region_for_summoner,
     fake_username_for_summoner,
 )
+from src.ui.theme import HEXVAULT_THEME, ICON_SIZE
 from src.ui.widgets.remote_image import RemoteImage
 from src.usecases.accounts import delete_account
 
-ICON_SIZE = (16, 16)
-
+from pyperclip import copy as copy_to_clipboard
 
 class ConfirmAccountRemovalScreen(ModalScreen[bool]):
     CSS = """
@@ -75,51 +74,97 @@ class AccountDetailScreen(Screen[bool | None]):
         padding: 1 2;
     }
 
+    .section {
+        border: round $accent 40%;
+        border-title-align: right;
+        border-title-color: $text-accent 50%;
+        padding: 1 2;
+    }
+
+    .section:focus-within {
+        border: round $accent 100%;
+        border-title-color: $foreground;
+        border-title-style: bold;
+    }
+
     #detail-hero {
-        min-height: 10;
-        max-height: 10;
+        height: 11;
+    }
+
+    #detail-icon-panel {
+        width: 20;
+        height: 10;
+        border: round $surface-lighten-2;
+        border-title-align: right;
+        border-title-color: $text-muted;
+        padding: 0 1;
+        align-horizontal: center;
     }
 
     #detail-account-icon {
         width: 16;
         height: auto;
-        margin-right: 2;
+    }
+
+    #detail-credentials-panel {
+        width: 36;
+        height: 10;
+        border: round $surface-lighten-2;
+        border-title-align: center;
+        border-title-color: $text-muted;
+        padding: 1 2;
+        align-vertical: middle;
+    }
+
+    #detail-profile-panel {
+        width: 1fr;
+        height: 10;
+        border: round $surface-lighten-2;
+        border-title-align: center;
+        border-title-color: $text-muted;
+        padding: 1 2;
+    }
+
+    #detail-collection-panel {
+        width: 1fr;
+        height: 10;
+        border: round $surface-lighten-2;
+        border-title-align: center;
+        border-title-color: $text-muted;
+        padding: 1 2;
+    }
+
+    #detail-quick-stats {
+        margin-top: 1;
+        color: $text-muted;
+        text-wrap: nowrap;
     }
 
     .muted {
         color: $text-muted;
     }
 
-    .detail-table {
-        min-height: 24;
-        max-height: 44;
-    }
-
-    .overview-section-title {
-        margin-top: 1;
-    }
-
     .overview-row {
-        max-height: 1;
+        height: 1;
     }
 
     .overview-label {
-        width: 18;
+        width: auto;
+        margin-right: 1;
         color: $text-muted;
+        text-wrap: nowrap;
     }
 
     .overview-value {
         width: 1fr;
         text-style: bold;
+        color: $primary;
+        text-wrap: nowrap;
     }
 
-    #overview-copy-actions {
-        margin-top: 1;
+    .detail-search {
         margin-bottom: 1;
-        max-height: 1;
-        min-height: 1;
     }
-
     """
 
     def __init__(
@@ -162,57 +207,39 @@ class AccountDetailScreen(Screen[bool | None]):
 
         with VerticalScroll(id="detail-root"):
             with Horizontal(id="detail-hero"):
-                yield RemoteImage(
-                    summoner.get("icon_url"),
-                    resize=ICON_SIZE,
-                    empty_text="No icon available",
-                    id="detail-account-icon",
-                )
-                with Vertical():
-                    yield Static(self._format_summoner_name(summoner), id="detail-title")
-                    yield Static(
-                        f"{self._format_region(summoner)}  Level {summoner.get('level') or '-'}",
-                        classes="muted",
+                with Vertical(id="detail-icon-panel") as panel:
+                    panel.border_title = self._format_summoner_name(summoner)
+                    yield RemoteImage(
+                        summoner.get("icon_url"),
+                        resize=ICON_SIZE,
+                        empty_text="No icon available",
+                        id="detail-account-icon",
                     )
-                    yield Rule()
-                    yield Static(primary_rank)
-                    yield Static(
-                        "  ".join(
-                            [
-                                f"Champions {len(collection.get('champions') or [])}",
-                                f"Skins {len(collection.get('skins') or [])}",
-                                f"BE {loot.get('blue_essence') or 0}",
-                                f"RP {loot.get('riot_points') or 0}",
-                            ]
-                        ),
-                        classes="muted",
-                    )
-            with TabbedContent(initial="overview"):
-                with TabPane("Overview", id="overview"):
-                    with Vertical():
-                        with Horizontal(id="overview-copy-actions"):
-                            yield Button("Login", id="copy-login", compact=True)
-                            yield Button("Password", id="copy-password", compact=True)
-                            yield Button("IDs", id="copy-ids", compact=True)
-                            yield Button("OP.GG", id="copy-opgg", compact=True)
-                        yield Static("", id="detail-copy-status", classes="muted")
-                        yield Static("Profile", classes="overview-section-title")
-                        yield Rule()
-                        yield from self._compose_overview_profile()
-                        yield Static("Currencies", classes="overview-section-title")
-                        yield Rule()
-                        yield from self._compose_overview_currencies()
-                        yield Static("Collection", classes="overview-section-title")
-                        yield Rule()
-                        yield from self._compose_overview_collection()
-                        yield Static("Ranked Queues", classes="overview-section-title")
-                        yield Rule()
-                        yield from self._compose_overview_ranked()
+                with Vertical(id="detail-credentials-panel") as panel:
+                    panel.border_title = "Credentials"
+                    with Horizontal():
+                        with Vertical():
+                            yield Button("Login", id="copy-login", compact=False)
+                            yield Button("Password", id="copy-password", compact=False)
+                        with Vertical():
+                            yield Button("IDs", id="copy-ids", compact=False)
+                            yield Button("OP.GG", id="copy-opgg", compact=False)
+                with Vertical(id="detail-profile-panel") as panel:
+                    panel.border_title = "Profile"
+                    yield from self._compose_overview_profile()
+                    yield from self._compose_overview_ranked()
+                with Vertical(id="detail-collection-panel") as panel:
+                    panel.border_title = "Collection"
+                    yield from self._compose_overview_currencies()
+                    yield from self._compose_overview_collection()
+                    
+            with TabbedContent(initial="champions"):
                 with TabPane("Champions", id="champions"):
                     yield Input(
                         placeholder="Search champions...",
                         id="detail-champions-search",
                         compact=True,
+                        classes="detail-search",
                     )
                     yield DataTable(id="detail-champions-table", classes="detail-table")
                 with TabPane("Skins", id="skins"):
@@ -220,6 +247,7 @@ class AccountDetailScreen(Screen[bool | None]):
                         placeholder="Search skins...",
                         id="detail-skins-search",
                         compact=True,
+                        classes="detail-search",
                     )
                     yield DataTable(id="detail-skins-table", classes="detail-table")
                 with TabPane("Loot", id="loot"):
@@ -227,6 +255,8 @@ class AccountDetailScreen(Screen[bool | None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        self.app.register_theme(HEXVAULT_THEME)
+        self.app.theme = "hexvault"
         self._populate_champions_table()
         self._populate_skins_table()
         self._populate_loot_table()
@@ -426,19 +456,9 @@ class AccountDetailScreen(Screen[bool | None]):
             return
 
         if not copy_value:
-            self.query_one("#detail-copy-status", Static).update(
-                f"{success_label} is empty"
-            )
             return
 
-        if self._copy_to_clipboard(copy_value):
-            self.query_one("#detail-copy-status", Static).update(
-                f"{success_label} copied to clipboard"
-            )
-        else:
-            self.query_one("#detail-copy-status", Static).update(
-                "Clipboard copy failed on this system"
-            )
+        copy_to_clipboard(copy_value)
 
     def _on_remove_confirmation(self, confirmed: bool) -> None:
         if not confirmed:
@@ -446,19 +466,10 @@ class AccountDetailScreen(Screen[bool | None]):
 
         account_id = self.account.get("id")
         if not isinstance(account_id, int):
-            self.query_one("#detail-copy-status", Static).update(
-                "Failed to remove account: invalid account id"
-            )
             return
 
         try:
             delete_account(account_id)
             self.dismiss(True)
         except Exception as exc:
-            self.query_one("#detail-copy-status", Static).update(
-                f"Failed to remove account: {exc}"
-            )
-
-    def _copy_to_clipboard(self, value: str) -> bool:
-        import pyperclip  # type: ignore
-        pyperclip.copy(value)
+            pass
