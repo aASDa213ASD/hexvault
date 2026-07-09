@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from importlib.resources import files
+
 from textual.theme import Theme
 
 
@@ -43,7 +45,9 @@ HEXVAULT_THEME = Theme(
     },
 )
 
-HEXVAULT_CSS = """
+POSTING_CSS = files("posting").joinpath("posting.scss").read_text(encoding="utf-8")
+
+HEXVAULT_CSS = POSTING_CSS + """
 Hexvault {
     background: $background;
 }
@@ -227,6 +231,22 @@ Hexvault {
 }
 
 .single-panel {
+    height: 1fr;
+}
+
+.posting-status {
+    width: 1fr;
+    height: 1;
+    margin-bottom: 0;
+    color: $text-muted;
+    text-wrap: wrap;
+}
+
+#posting-tab {
+    padding: 0;
+}
+
+#posting-tab MainScreen {
     height: 1fr;
 }
 

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import ssl
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
+
+import psutil
 
 from src.datadragon.client import (
     get_icon_url,
@@ -34,21 +34,75 @@ class LcuConfig:
     password: str
 
 
-def _read_lockfile() -> LcuConfig | None:
-    base_path = os.getenv("LEAGUE_OF_LEGENDS_PATH")
-    if not base_path:
-        return None
-    lockfile = Path(base_path) / "lockfile"
-    if not lockfile.exists():
-        return None
-    payload = lockfile.read_text(encoding="utf-8").strip()
-    parts = payload.split(":")
-    if len(parts) < 5:
-        return None
-    port = parts[2]
-    password = parts[3]
-    protocol = parts[4]
-    return LcuConfig(base_url=f"{protocol}://127.0.0.1:{port}", password=password)
+@dataclass
+class LcuProcessConfig:
+    league_client: LcuConfig | None
+    riot_client: LcuConfig | None
+    region: str | None = None
+
+
+def _read_lcu_process_config() -> LcuProcessConfig | None:
+    for process in psutil.process_iter(["name", "cmdline"]):
+        try:
+            name = process.info.get("name") or ""
+            if name.lower() != "leagueclientux.exe":
+                continue
+
+            args = process.info.get("cmdline") or []
+        except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess):
+            continue
+
+        values: dict[str, str] = {}
+        for arg in args:
+            if not arg.startswith("--") or "=" not in arg:
+                continue
+            key, value = arg[2:].split("=", 1)
+            values[key] = value
+
+        league_client = None
+        app_port = values.get("app-port")
+        remoting_auth_token = values.get("remoting-auth-token")
+        if app_port and remoting_auth_token:
+            league_client = LcuConfig(
+                base_url=f"https://127.0.0.1:{app_port}",
+                password=remoting_auth_token,
+            )
+
+        riot_client = None
+        riot_app_port = values.get("riotclient-app-port")
+        riot_auth_token = values.get("riotclient-auth-token")
+        if riot_app_port and riot_auth_token:
+            riot_client = LcuConfig(
+                base_url=f"https://127.0.0.1:{riot_app_port}",
+                password=riot_auth_token,
+            )
+
+        if league_client or riot_client:
+            return LcuProcessConfig(
+                league_client=league_client,
+                riot_client=riot_client,
+                region=(values.get("region") or "").lower() or None,
+            )
+
+    return None
+
+
+def _read_lcu_process() -> LcuConfig | None:
+    config = _read_lcu_process_config()
+    return config.league_client if config else None
+
+
+def get_lcu_config() -> LcuConfig | None:
+    return _read_lcu_process()
+
+
+def get_riot_client_config() -> LcuConfig | None:
+    config = _read_lcu_process_config()
+    return config.riot_client if config else None
+
+
+def get_lcu_process_config() -> LcuProcessConfig | None:
+    return _read_lcu_process_config()
 
 
 def _request(config: LcuConfig, path: str) -> Any:
@@ -133,7 +187,7 @@ def _parse_rank_division(tier: str, value: str | None) -> str | None:
 
 
 def clear_challenges_preferences() -> dict | None:
-    config = _read_lockfile()
+    config = _read_lcu_process()
     if not config:
         return None
 
@@ -154,7 +208,7 @@ def clear_challenges_preferences() -> dict | None:
 
 
 def set_current_summoner_icon(profile_icon_id: int) -> dict | None:
-    config = _read_lockfile()
+    config = _read_lcu_process()
     if not config:
         return None
 
@@ -175,7 +229,7 @@ def set_current_summoner_icon(profile_icon_id: int) -> dict | None:
 
 
 def get_matchmaking_search_state() -> str | None:
-    config = _read_lockfile()
+    config = _read_lcu_process()
     if not config:
         return None
     
@@ -196,7 +250,7 @@ def is_match_searching() -> bool:
 
 
 def accept_ready_check() -> dict | None:
-    config = _read_lockfile()
+    config = _read_lcu_process()
     if not config:
         return None
 
@@ -216,7 +270,7 @@ def accept_ready_check() -> dict | None:
 
 
 def dodge_champ_select() -> dict | None:
-    config = _read_lockfile()
+    config = _read_lcu_process()
     if not config:
         return None
 
@@ -236,12 +290,13 @@ def dodge_champ_select() -> dict | None:
 
 
 def get_current_account() -> dict | None:
-    config = _read_lockfile()
+    config = _read_lcu_process()
     if not config:
         return None
 
     current = _request(config, Endpoint.CURRENT_SUMMONER)
-    region_data = _request(config, Endpoint.CURRENT_REGION)
+    riot_config = get_riot_client_config()
+    region_data = _request(riot_config or config, Endpoint.CURRENT_REGION)
     if not current or not region_data:
         return None
 
@@ -298,7 +353,7 @@ def get_current_account() -> dict | None:
     }
 
 def get_current_summoner() -> dict | None:
-    config = _read_lockfile()
+    config = _read_lcu_process()
     if not config:
         return None
 
