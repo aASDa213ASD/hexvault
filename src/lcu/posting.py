@@ -1,182 +1,85 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
-
-import httpx
-from posting.app import MainScreen
-from posting.collection import Collection
-from posting.config import SETTINGS, Settings
-from posting.variables import load_variables
-from textual.reactive import reactive
-from textual.widget import Widget
 
 from src.lcu.client import get_lcu_process_config
+from src.ui.theme import HEXVAULT_THEME_COLORS
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-POSTING_DIR = ROOT_DIR / "var" / "posting" / "lcu"
-COLLECTION_DIR = POSTING_DIR / "collection"
-ENV_PATH = POSTING_DIR / "lcu.env"
+POSTING_DIR = ROOT_DIR / "var" / "posting"
+LCU_DIR = POSTING_DIR / "lcu"
+COLLECTION_DIR = LCU_DIR / "collection"
+ENV_PATH = LCU_DIR / "lcu.env"
+CONFIG_PATH = LCU_DIR / "posting-config.yaml"
+THEMES_DIR = LCU_DIR / "themes"
+THEME_PATH = THEMES_DIR / "hexvault.yaml"
+RUNNER_PATH = LCU_DIR / "run-posting.py"
+RUNTIME_DIR = POSTING_DIR / "runtime"
+RUNTIME_PYTHON = RUNTIME_DIR / "Scripts" / "python.exe"
+LAUNCHER_PATH = LCU_DIR / "launch-posting.cmd"
+POSTING_VERSION = "2.10.0"
 
 
 @dataclass
 class LcuPostingWorkspace:
-    collection: Collection
-    environment_files: tuple[Path, ...]
-    settings: Settings
     status: str
+    collection_path: Path
+    env_path: Path
+    config_path: Path
+    theme_path: Path
+    runner_path: Path
+    launcher_path: Path
+    runtime_path: Path
 
 
-class EmbeddedPostingMain(Widget, inherit_bindings=False):
-    AUTO_FOCUS = MainScreen.AUTO_FOCUS
-    BINDING_GROUP_TITLE = MainScreen.BINDING_GROUP_TITLE
-    BINDINGS = MainScreen.BINDINGS
-
-    selected_method = reactive("GET", init=False)
-    current_layout = reactive("vertical", init=False)
-    expanded_section = reactive(None, init=False)
-    _jumping = reactive(False, init=False, bindings=True)
-
-    compose = MainScreen.compose
-    get_and_run_script = MainScreen.get_and_run_script
-    send_request = MainScreen.send_request
-    send_via_worker = MainScreen.send_via_worker
-    on_method_selector_changed = MainScreen.on_method_selector_changed
-    handle_submit_via_event = MainScreen.handle_submit_via_event
-    on_response_received = MainScreen.on_response_received
-    on_request_selected = MainScreen.on_request_selected
-    on_request_cache_updated = MainScreen.on_request_cache_updated
-    on_url_param_jump = MainScreen.on_url_param_jump
-    on_path_param_jump = MainScreen.on_path_param_jump
-    on_path_param_renamed = MainScreen.on_path_param_renamed
-    watch_current_layout = MainScreen.watch_current_layout
-    watch_expanded_section = MainScreen.watch_expanded_section
-    action_send_request = MainScreen.action_send_request
-    action_change_method = MainScreen.action_change_method
-    action_toggle_collection_browser = MainScreen.action_toggle_collection_browser
-    action_toggle_expanded = MainScreen.action_toggle_expanded
-    expand_section = MainScreen.expand_section
-    focus_within_request = MainScreen.focus_within_request
-    focus_within_response = MainScreen.focus_within_response
-    action_save_request = MainScreen.action_save_request
-    action_new_request = MainScreen.action_new_request
-    on_request_body_change = MainScreen.on_request_body_change
-    on_content_changed = MainScreen.on_content_changed
-    on_params_changed = MainScreen.on_params_changed
-    on_path_params_changed = MainScreen.on_path_params_changed
-    on_path_param_values_updated = MainScreen.on_path_param_values_updated
-    on_url_changed = MainScreen.on_url_changed
-    _sync_path_params_from_url = MainScreen._sync_path_params_from_url
-    log_request_trace_event = MainScreen.log_request_trace_event
-    action_open_request_search_palette = MainScreen.action_open_request_search_palette
-    action_toggle_jump_mode = MainScreen.action_toggle_jump_mode
-    watch__jumping = MainScreen.watch__jumping
-    build_request_model = MainScreen.build_request_model
-    build_httpx_request = MainScreen.build_httpx_request
-    load_request_model = MainScreen.load_request_model
-    on_curl_message = MainScreen.on_curl_message
-    url_bar = MainScreen.url_bar
-    footer = MainScreen.footer
-    method_selector = MainScreen.method_selector
-    url_input = MainScreen.url_input
-    request_editor = MainScreen.request_editor
-    response_area = MainScreen.response_area
-    request_body_text_area = MainScreen.request_body_text_area
-    headers_table = MainScreen.headers_table
-    params_table = MainScreen.params_table
-    path_params_table = MainScreen.path_params_table
-    app_body = MainScreen.app_body
-    app_header = MainScreen.app_header
-    request_options = MainScreen.request_options
-    request_metadata = MainScreen.request_metadata
-    collection_browser = MainScreen.collection_browser
-    request_auth = MainScreen.request_auth
-    request_scripts = MainScreen.request_scripts
-    collection_tree = MainScreen.collection_tree
-    response_trace = MainScreen.response_trace
-    response_script_output = MainScreen.response_script_output
-
-    def __init__(
-        self,
-        collection: Collection,
-        layout: str,
-        environment_files: tuple[Path, ...],
-    ) -> None:
-        super().__init__()
-        self.collection = collection
-        self.cookies: httpx.Cookies = httpx.Cookies()
-        self._initial_layout = layout
-        self.environment_files = environment_files
-        self.settings = SETTINGS.get()
-        self.jumper = None
-        self.posting = cast("object", self.app)
-        self.styles.width = "1fr"
-        self.styles.height = "1fr"
-
-    def on_mount(self) -> None:
-        MainScreen.on_mount(self)  # type: ignore[arg-type]
-        MainScreen.on_screen_resume(self)  # type: ignore[arg-type]
-
-    def set_focus(self, widget: Widget | None, scroll_visible: bool = True) -> None:
-        self.app.set_focus(widget, scroll_visible=scroll_visible)
-
-
-def build_lcu_posting_workspace() -> LcuPostingWorkspace:
+def prepare_lcu_posting_workspace() -> LcuPostingWorkspace:
     status = refresh_lcu_posting_credentials()
     _write_collection()
-
-    env_paths = (ENV_PATH.resolve(),)
-    settings = Settings(
-        _env_file=env_paths,  # type: ignore[call-arg]
-        heading={"visible": False},
-        watch_env_files=False,
-        watch_collection_files=False,
-        watch_themes=False,
-        load_user_themes=False,
-        load_builtin_themes=True,
-        theme="galaxy",
-        spacing="compact",
-    )
-    SETTINGS.set(settings)
-    load_variables(env_paths, settings.use_host_environment, avoid_cache=True)
-
+    _write_theme_files()
+    _write_runner()
+    _write_launcher()
     return LcuPostingWorkspace(
-        collection=Collection.from_directory(str(COLLECTION_DIR.resolve())),
-        environment_files=env_paths,
-        settings=settings,
         status=status,
+        collection_path=COLLECTION_DIR,
+        env_path=ENV_PATH,
+        config_path=CONFIG_PATH,
+        theme_path=THEME_PATH,
+        runner_path=RUNNER_PATH,
+        launcher_path=LAUNCHER_PATH,
+        runtime_path=RUNTIME_DIR,
     )
 
 
-def create_lcu_posting_screen_for_workspace(
-    workspace: LcuPostingWorkspace,
-) -> EmbeddedPostingMain:
-    SETTINGS.set(workspace.settings)
-    return EmbeddedPostingMain(
-        collection=workspace.collection,
-        layout=workspace.settings.layout,
-        environment_files=workspace.environment_files,
-    )
-
-
-def refresh_lcu_posting_workspace(workspace: LcuPostingWorkspace) -> str:
+def refresh_lcu_posting_workspace() -> str:
     status = refresh_lcu_posting_credentials()
-    SETTINGS.set(workspace.settings)
-    load_variables(
-        workspace.environment_files,
-        workspace.settings.use_host_environment,
-        avoid_cache=True,
-    )
-    workspace.status = status
+    _write_collection()
+    _write_theme_files()
+    _write_runner()
+    _write_launcher()
     return status
+
+
+def run_lcu_posting_foreground() -> None:
+    workspace = prepare_lcu_posting_workspace()
+    env = os.environ.copy()
+    env["HEXVAULT_PYTHON"] = sys.executable
+    subprocess.run(
+        [str(workspace.launcher_path)],
+        cwd=ROOT_DIR,
+        env=env,
+        check=False,
+    )
 
 
 def refresh_lcu_posting_credentials() -> str:
     config = get_lcu_process_config()
-    POSTING_DIR.mkdir(parents=True, exist_ok=True)
+    LCU_DIR.mkdir(parents=True, exist_ok=True)
 
     if not config:
         ENV_PATH.write_text(
@@ -191,7 +94,7 @@ def refresh_lcu_posting_credentials() -> str:
             ),
             encoding="utf-8",
         )
-        return "LeagueClientUx.exe not found. Start League Client, then refresh LCU."
+        return "FATAL: League Client not found, can not send requests to LCU and Riot API"
 
     league_client = config.league_client
     riot_client = config.riot_client
@@ -217,50 +120,356 @@ def refresh_lcu_posting_credentials() -> str:
     return "Credentials loaded for " + ", ".join(loaded) + "."
 
 
+def _write_launcher() -> None:
+    LCU_DIR.mkdir(parents=True, exist_ok=True)
+    LAUNCHER_PATH.write_text(
+        "\n".join(
+            [
+                "@echo off",
+                "setlocal",
+                'set "LCU_DIR=%~dp0"',
+                'for %%I in ("%LCU_DIR%..") do set "POSTING_DIR=%%~fI"',
+                'for %%I in ("%LCU_DIR%..\\..\\..") do set "ROOT_DIR=%%~fI"',
+                'set "RUNTIME_DIR=%POSTING_DIR%\\runtime"',
+                'set "RUNTIME_PYTHON=%RUNTIME_DIR%\\Scripts\\python.exe"',
+                'set "COLLECTION_DIR=%LCU_DIR%collection"',
+                'set "ENV_PATH=%LCU_DIR%lcu.env"',
+                'set "POSTING_CONFIG_FILE=%LCU_DIR%posting-config.yaml"',
+                'cd /d "%ROOT_DIR%"',
+                'if not exist "%RUNTIME_PYTHON%" (',
+                "  echo Creating isolated Posting runtime...",
+                '  if defined HEXVAULT_PYTHON "%HEXVAULT_PYTHON%" -m venv "%RUNTIME_DIR%"',
+                "  if errorlevel 1 if defined HEXVAULT_PYTHON goto :error",
+                '  if not defined HEXVAULT_PYTHON py -3 -m venv "%RUNTIME_DIR%"',
+                "  if errorlevel 1 python -m venv \"%RUNTIME_DIR%\"",
+                "  if errorlevel 1 goto :error",
+                ")",
+                '"%RUNTIME_PYTHON%" -m pip show posting >nul 2>nul',
+                "set POSTING_MISSING=%errorlevel%",
+                '"%RUNTIME_PYTHON%" -m pip show psutil >nul 2>nul',
+                "set PSUTIL_MISSING=%errorlevel%",
+                "if not \"%POSTING_MISSING%%PSUTIL_MISSING%\"==\"00\" (",
+                f'  "%RUNTIME_PYTHON%" -m pip install posting=={POSTING_VERSION} psutil^>=7.0.0',
+                "  if errorlevel 1 goto :error",
+                ")",
+                '"%RUNTIME_PYTHON%" "%LCU_DIR%run-posting.py"',
+                "goto :done",
+                ":error",
+                "echo Failed to start Posting.",
+                "pause",
+                ":done",
+                "endlocal",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_runner() -> None:
+    LCU_DIR.mkdir(parents=True, exist_ok=True)
+    RUNNER_PATH.write_text(
+        r'''
+from __future__ import annotations
+
+from pathlib import Path
+
+import psutil
+from posting.app import MainScreen, Posting
+from posting.collection import Collection
+from posting.config import Settings
+from posting.variables import load_variables, update_variables
+from textual import on
+from textual.app import ComposeResult
+from textual.widgets import Button
+
+
+LCU_DIR = Path(__file__).resolve().parent
+COLLECTION_DIR = LCU_DIR / "collection"
+ENV_PATH = LCU_DIR / "lcu.env"
+
+
+def refresh_lcu_credentials() -> str:
+    config = _read_lcu_process_config()
+    if not config:
+        ENV_PATH.write_text(
+            "\n".join(
+                [
+                    "LCU_BASE_URL=https://127.0.0.1:0",
+                    "LCU_PASSWORD=",
+                    "RIOT_CLIENT_BASE_URL=https://127.0.0.1:0",
+                    "RIOT_CLIENT_PASSWORD=",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        return "LeagueClientUx.exe not found."
+
+    league_client = config.get("league_client")
+    riot_client = config.get("riot_client")
+    ENV_PATH.write_text(
+        "\n".join(
+            [
+                f"LCU_BASE_URL={league_client['base_url'] if league_client else 'https://127.0.0.1:0'}",
+                f"LCU_PASSWORD={league_client['password'] if league_client else ''}",
+                f"RIOT_CLIENT_BASE_URL={riot_client['base_url'] if riot_client else 'https://127.0.0.1:0'}",
+                f"RIOT_CLIENT_PASSWORD={riot_client['password'] if riot_client else ''}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    loaded = []
+    if league_client:
+        loaded.append(f"LCU {league_client['base_url']}")
+    if riot_client:
+        loaded.append(f"Riot Client {riot_client['base_url']}")
+    return "Credentials loaded for " + ", ".join(loaded) + "."
+
+
+def _read_lcu_process_config() -> dict | None:
+    for process in psutil.process_iter(["name", "cmdline"]):
+        try:
+            name = process.info.get("name") or ""
+            if name.lower() != "leagueclientux.exe":
+                continue
+            args = process.info.get("cmdline") or []
+        except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess):
+            continue
+
+        values = {}
+        for arg in args:
+            if not arg.startswith("--") or "=" not in arg:
+                continue
+            key, value = arg[2:].split("=", 1)
+            values[key] = value
+
+        league_client = None
+        app_port = values.get("app-port")
+        remoting_auth_token = values.get("remoting-auth-token")
+        if app_port and remoting_auth_token:
+            league_client = {
+                "base_url": f"https://127.0.0.1:{app_port}",
+                "password": remoting_auth_token,
+            }
+
+        riot_client = None
+        riot_app_port = values.get("riotclient-app-port")
+        riot_auth_token = values.get("riotclient-auth-token")
+        if riot_app_port and riot_auth_token:
+            riot_client = {
+                "base_url": f"https://127.0.0.1:{riot_app_port}",
+                "password": riot_auth_token,
+            }
+
+        if league_client or riot_client:
+            return {"league_client": league_client, "riot_client": riot_client}
+    return None
+
+
+class HexvaultPostingScreen(MainScreen):
+    def on_mount(self) -> None:
+        super().on_mount()
+        self.border_title = "League Client"
+        self.border_subtitle = "LCU API Interface"
+
+    def compose(self) -> ComposeResult:
+        yield from super().compose()
+        yield Button("Refresh LCU", id="hexvault-refresh-lcu")
+
+    @on(Button.Pressed, "#hexvault-refresh-lcu")
+    def refresh_lcu(self) -> None:
+        status = refresh_lcu_credentials()
+        load_variables(
+            self.environment_files,
+            self.settings.use_host_environment,
+            avoid_cache=True,
+        )
+        update_variables(self.app.session_env)
+        self.app.env_changed_signal.publish(None)
+        self.notify(status, title="LCU refreshed", timeout=4)
+
+
+class HexvaultPosting(Posting):
+    BINDINGS = [("q", "quit", "Quit")]
+    CSS = """
+    HexvaultPostingScreen {
+        border: round $accent 40%;
+        border-title-align: right;
+        border-title-color: $text-accent 50%;
+        border-subtitle-color: $text-muted;
+        padding: 1 1;
+    }
+
+    HexvaultPostingScreen:focus-within {
+        border: round $accent 100%;
+        border-title-color: $foreground;
+        border-title-style: bold;
+    }
+
+    #hexvault-refresh-lcu {
+        width: 1fr;
+        margin-top: 1;
+    }
+    """
+
+    def get_default_screen(self) -> HexvaultPostingScreen:
+        self.main_screen = HexvaultPostingScreen(
+            collection=self.collection,
+            layout=self.settings.layout,
+            environment_files=self.environment_files,
+        )
+        return self.main_screen
+
+
+def main() -> None:
+    refresh_lcu_credentials()
+    env_paths = (ENV_PATH.resolve(),)
+    settings = Settings(_env_file=env_paths)
+    load_variables(env_paths, settings.use_host_environment, avoid_cache=True)
+    collection = Collection.from_directory(str(COLLECTION_DIR.resolve()))
+    app = HexvaultPosting(settings, env_paths, collection, True)
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
+'''.lstrip(),
+        encoding="utf-8",
+    )
+
+
+def _write_theme_files() -> None:
+    THEMES_DIR.mkdir(parents=True, exist_ok=True)
+    theme_directory = _relative_to_root(THEMES_DIR)
+    CONFIG_PATH.write_text(
+        "\n".join(
+            [
+                "theme: hexvault",
+                f'theme_directory: "{theme_directory}"',
+                "load_user_themes: true",
+                "load_builtin_themes: true",
+                "spacing: standard",
+                "heading:",
+                "  visible: false",
+                "  show_version: false",
+                "  show_host: false",
+                "watch_themes: true",
+                "watch_env_files: true",
+                "watch_collection_files: true",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    THEME_PATH.write_text(
+        "\n".join(
+            [
+                "name: hexvault",
+                f"primary: '{HEXVAULT_THEME_COLORS['primary']}'",
+                f"secondary: '{HEXVAULT_THEME_COLORS['secondary']}'",
+                f"accent: '{HEXVAULT_THEME_COLORS['accent']}'",
+                f"background: '{HEXVAULT_THEME_COLORS['background']}'",
+                f"surface: '{HEXVAULT_THEME_COLORS['surface']}'",
+                f"panel: '{HEXVAULT_THEME_COLORS['panel']}'",
+                f"warning: '{HEXVAULT_THEME_COLORS['warning']}'",
+                f"error: '{HEXVAULT_THEME_COLORS['error']}'",
+                f"success: '{HEXVAULT_THEME_COLORS['success']}'",
+                "dark: true",
+                "text_area:",
+                "  gutter: 'dim'",
+                f"  cursor: 'reverse {HEXVAULT_THEME_COLORS['primary']}'",
+                f"  cursor_line: 'on {HEXVAULT_THEME_COLORS['surface']}'",
+                f"  selection: 'on {HEXVAULT_THEME_COLORS['secondary']}'",
+                "syntax:",
+                f"  json_key: '{HEXVAULT_THEME_COLORS['primary']}'",
+                f"  json_string: '{HEXVAULT_THEME_COLORS['success']}'",
+                f"  json_number: '{HEXVAULT_THEME_COLORS['warning']}'",
+                f"  json_boolean: '{HEXVAULT_THEME_COLORS['secondary']}'",
+                f"  json_null: '{HEXVAULT_THEME_COLORS['error']}'",
+                "url:",
+                f"  base: '{HEXVAULT_THEME_COLORS['secondary']}'",
+                f"  protocol: 'bold {HEXVAULT_THEME_COLORS['accent']}'",
+                "  separator: 'dim'",
+                "variable:",
+                f"  resolved: '{HEXVAULT_THEME_COLORS['success']}'",
+                f"  unresolved: '{HEXVAULT_THEME_COLORS['error']}'",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def _write_collection() -> None:
     COLLECTION_DIR.mkdir(parents=True, exist_ok=True)
     requests = [
-        ("Summoner", "current-summoner", "GET", "/lol-summoner/v1/current-summoner"),
+        (
+            "Summoner",
+            "current-summoner",
+            "GET",
+            "/lol-summoner/v1/current-summoner"
+        ),
         (
             "Summoner",
             "current-summoner-icon",
             "PUT",
             "/lol-summoner/v1/current-summoner/icon",
-            {"profileIconId": 1},
+            {"profileIconId": 1}
         ),
-        ("Session", "region-locale", "GET", "/riotclient/region-locale"),
-        ("Riot Client", "ux-state", "GET", "/riotclient/ux-state"),
+        (
+            "Riot Client",
+            "region-locale",
+            "GET",
+            "/riotclient/region-locale"
+        ),
         (
             "Ranked",
             "current-ranked-stats",
             "GET",
-            "/lol-ranked/v1/current-ranked-stats",
+            "/lol-ranked/v1/current-ranked-stats"
         ),
-        ("Inventory", "wallet", "GET", "/lol-inventory/v1/wallet/rp"),
-        ("Inventory", "owned-loot", "GET", "/lol-loot/v1/player-loot"),
         (
-            "Collection",
+            "Account",
+            "email-verification",
+            "GET",
+            "/lol-email-verification/v1/email"
+        ),
+        (
+            "Account",
+            "wallet",
+            "GET",
+            "/lol-inventory/v1/wallet/rp"
+        ),
+        (
+            "Account",
+            "owned-loot",
+            "GET",
+            "/lol-loot/v1/player-loot"
+        ),
+        (
+            "Account",
             "owned-champions",
             "GET",
-            "/lol-champions/v1/owned-champions-minimal",
+            "/lol-champions/v1/owned-champions-minimal"
         ),
         (
-            "Collection",
+            "Account",
             "owned-skins",
             "GET",
-            "/lol-inventory/v2/inventory/CHAMPION_SKIN",
+            "/lol-inventory/v2/inventory/CHAMPION_SKIN"
         ),
         (
             "Matchmaking",
             "search-state",
             "GET",
-            "/lol-lobby/v2/lobby/matchmaking/search-state",
+            "/lol-lobby/v2/lobby/matchmaking/search-state"
         ),
         (
             "Matchmaking",
             "accept-ready-check",
             "POST",
-            "/lol-matchmaking/v1/ready-check/accept",
+            "/lol-matchmaking/v1/ready-check/accept"
         ),
         (
             "Challenges",
@@ -278,9 +487,7 @@ def _write_collection() -> None:
                 '?destination=lcdsServiceProxy&method=call&args=["","teambuilder-draft","quitV2",""]'
             ),
             {},
-        ),
-        ("Manual", "league-client-scratch", "GET", "/lol-summoner/v1/current-summoner"),
-        ("Manual", "riot-client-scratch", "GET", "/riotclient/region-locale"),
+        )
     ]
 
     for request in requests:
@@ -342,3 +549,10 @@ def _write_request(
 
 def _yaml_scalar(value: str) -> str:
     return json.dumps(value)
+
+
+def _relative_to_root(path: Path) -> str:
+    try:
+        return path.relative_to(ROOT_DIR).as_posix()
+    except ValueError:
+        return path.as_posix()

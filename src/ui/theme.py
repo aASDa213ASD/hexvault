@@ -1,13 +1,23 @@
 from __future__ import annotations
 
-from importlib.resources import files
-
 from textual.theme import Theme
 
 
 ICON_SIZE = (16, 16)
 CLIENT_ICON_SIZE = (8, 8)
 RANK_ICON_SIZE = (16, 16)
+HEXVAULT_THEME_COLORS = {
+    "primary": "#F4F1EA",
+    "secondary": "#89B4FA",
+    "accent": "#E6C384",
+    "foreground": "#D7D3C8",
+    "background": "#101014",
+    "surface": "#181820",
+    "panel": "#22222C",
+    "success": "#A6D189",
+    "warning": "#E6C384",
+    "error": "#E78284",
+}
 RANK_COLORS = {
     "Unranked": "#999999",
     "Iron": "#645E5A",
@@ -25,16 +35,16 @@ RANK_COLORS = {
 
 HEXVAULT_THEME = Theme(
     name="hexvault",
-    primary="#F4F1EA",
-    secondary="#89B4FA",
-    accent="#E6C384",
-    foreground="#D7D3C8",
-    background="#101014",
-    surface="#181820",
-    panel="#22222C",
-    success="#A6D189",
-    warning="#E6C384",
-    error="#E78284",
+    primary=HEXVAULT_THEME_COLORS["primary"],
+    secondary=HEXVAULT_THEME_COLORS["secondary"],
+    accent=HEXVAULT_THEME_COLORS["accent"],
+    foreground=HEXVAULT_THEME_COLORS["foreground"],
+    background=HEXVAULT_THEME_COLORS["background"],
+    surface=HEXVAULT_THEME_COLORS["surface"],
+    panel=HEXVAULT_THEME_COLORS["panel"],
+    success=HEXVAULT_THEME_COLORS["success"],
+    warning=HEXVAULT_THEME_COLORS["warning"],
+    error=HEXVAULT_THEME_COLORS["error"],
     dark=True,
     variables={
         "block-cursor-text-style": "bold",
@@ -45,9 +55,7 @@ HEXVAULT_THEME = Theme(
     },
 )
 
-POSTING_CSS = files("posting").joinpath("posting.scss").read_text(encoding="utf-8")
-
-HEXVAULT_CSS = POSTING_CSS + """
+HEXVAULT_CSS = """
 Hexvault {
     background: $background;
 }
@@ -243,11 +251,16 @@ Hexvault {
 }
 
 #posting-tab {
-    padding: 0;
+    padding: 1 2;
 }
 
-#posting-tab MainScreen {
-    height: 1fr;
+#posting-actions {
+    height: auto;
+}
+
+.posting-action {
+    width: 1fr;
+    margin-right: 1;
 }
 
 #lcu-actions {

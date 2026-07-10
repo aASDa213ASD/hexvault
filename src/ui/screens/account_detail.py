@@ -71,6 +71,7 @@ class AccountDetailScreen(Screen[bool | None]):
     ]
     CSS = """
     #detail-root {
+        height: 1fr;
         padding: 1 2;
     }
 
@@ -88,7 +89,7 @@ class AccountDetailScreen(Screen[bool | None]):
     }
 
     #detail-hero {
-        height: 11;
+        height: 10;
     }
 
     #detail-icon-panel {
@@ -163,7 +164,15 @@ class AccountDetailScreen(Screen[bool | None]):
     }
 
     .detail-search {
-        margin-bottom: 1;
+        margin-top: 0;
+    }
+
+    #detail-items {
+        height: 1fr;
+    }
+
+    .detail-table {
+        height: 1fr;
     }
     """
 
@@ -232,8 +241,10 @@ class AccountDetailScreen(Screen[bool | None]):
                     panel.border_title = "Collection"
                     yield from self._compose_overview_currencies()
                     yield from self._compose_overview_collection()
-                    
-            with TabbedContent(initial="champions"):
+            
+            with TabbedContent(initial="champions", classes="section", id="detail-items") as panel:
+                panel.border_title = "Items"
+                panel.border_subtitle = "Table of posessions on this account"
                 with TabPane("Champions", id="champions"):
                     yield Input(
                         placeholder="Search champions...",

@@ -1,22 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Sequence
 
 from rich.text import Text
 from textual.app import App, ComposeResult
-from textual.command import CommandListItem, CommandPalette, SimpleProvider
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.reactive import reactive
-from textual.signal import Signal
 from textual.widgets import Button, Checkbox, DataTable, Footer, Static, TabbedContent, TabPane
 
 from src.database.connection import init_db
 from src.lcu.client import get_current_summoner
 from src.lcu.posting import (
-    build_lcu_posting_workspace,
-    create_lcu_posting_screen_for_workspace,
-    refresh_lcu_posting_workspace,
+    prepare_lcu_posting_workspace,
+    run_lcu_posting_foreground,
 )
 from src.ui.anonymization import (
     fake_rank_for_account,
@@ -49,24 +44,12 @@ RANKS_DIR = Path(__file__).resolve().parents[3] / "resources" / "ranks"
 class Hexvault(App):
     BINDINGS = [("q", "quit", "Quit")]
     CSS = HEXVAULT_CSS
-    spacing = reactive("compact", init=False)
 
     def __init__(self) -> None:
-        self._posting_workspace = build_lcu_posting_workspace()
-        self.settings = self._posting_workspace.settings
-        self.environment_files = self._posting_workspace.environment_files
-        self.collection = self._posting_workspace.collection
-        self.collection_specified = True
-        self.session_env: dict[str, object] = {}
+        self._posting_workspace = prepare_lcu_posting_workspace()
         super().__init__()
-        self.env_changed_signal = Signal[None](self, "env-changed")
-        self.spacing = self._posting_workspace.settings.spacing
 
     def compose(self) -> ComposeResult:
-        posting_screen = create_lcu_posting_screen_for_workspace(
-            self._posting_workspace
-        )
-
         with Vertical(id="app-root"):
             with TabbedContent(initial="accounts"):
                 with TabPane("Accounts", id="accounts"):
@@ -165,12 +148,12 @@ class Hexvault(App):
                             id="posting-status",
                             classes="posting-status",
                         )
-                        yield Button(
-                            "Refresh LCU",
-                            id="refresh-posting-lcu",
-                            classes="client-sync-button",
-                        )
-                        yield posting_screen
+                        with Horizontal(id="posting-actions"):
+                            yield Button(
+                                "API Client",
+                                id="open-posting-here",
+                                classes="posting-action",
+                            )
                 with TabPane("Settings", id="settings"):
                     with Vertical(classes="section single-panel") as panel:
                         panel.border_title = "Privacy"
@@ -421,9 +404,9 @@ class Hexvault(App):
         self.query_one("#lcu-sync-status", Static).update(message)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "refresh-posting-lcu":
-            status = refresh_lcu_posting_workspace(self._posting_workspace)
-            self.query_one("#posting-status", Static).update(status)
+        if event.button.id == "open-posting-here":
+            with self.suspend():
+                status = run_lcu_posting_foreground()
             return
 
         if event.button.id != "lcu-sync":
@@ -507,16 +490,3 @@ class Hexvault(App):
                 line = f"{line} ({error})"
             lines.append(line)
         self.query_one("#health-status", Static).update("\n".join(lines))
-
-    def search_commands(
-        self,
-        commands: Sequence[CommandListItem],
-        placeholder: str = "Search for commands...",
-        palette_id: str = "",
-    ):
-        palette = CommandPalette(
-            providers=[SimpleProvider(self.screen, commands)],
-            placeholder=placeholder,
-            id=palette_id or None,
-        )
-        return self.push_screen(palette)
