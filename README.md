@@ -3,7 +3,7 @@ Software to store your league of legends accounts, private and open source.
 
 Made for everyone who uses `.txt` files or google tables to store their accounts.
 
-![Hexvault](.github/showcase.jpg)
+![Hexvault](.github/hexvault.svg)
 
 # Requirements
 You'll need **[Python 3.14](https://www.python.org/downloads/release/python-3140/)** or higher and preferably a good terminal emulator, for windows users - **[Windows Terminal](https://aka.ms/terminal)**.
@@ -34,3 +34,8 @@ Current implementation uses **[Python](https://www.python.org/)** and heavily ab
 Software itself uses an authorized League of Legends Client, **[LCU](https://riot-api-libraries.readthedocs.io/en/latest/lcu.html)** to get a rich snapshot of current account and store it inside of **[SQlite3](https://sqlite.org/index.html)** database. For champions, skins, icons and any other resource from the game it uses **[CommunityDragon](https://www.communitydragon.org/)** as the main source of truth.
 
 After syncing the account you will get a ton of information about it which can be inspected in a **[database models](src/database/models.py)** file.
+
+# Manual LCU requests
+The **Client** tab can open a preconfigured **[Posting](https://github.com/darrenburns/posting)** workspace for manual League Client and Riot Client requests. Hexvault keeps its own Textual dependency independent from Posting by creating an isolated Posting runtime under `var/posting/runtime` on first launch. Use **Open Posting** for a separate terminal window, or **Open Here** to temporarily suspend Hexvault and run Posting in the same terminal until Posting exits.
+
+Request templates and current process credentials are generated under `var/posting/lcu`. The generated `lcu.env` file is ignored by git.
