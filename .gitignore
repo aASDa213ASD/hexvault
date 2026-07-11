@@ -7,6 +7,10 @@ var/accounts.db
 var/cache/
 var/*
 
+# Generated Posting integration files
+intergration/posting/lcu/
+intergration/posting/runtime/
+
 # Environment
 .env*
 !.env.example

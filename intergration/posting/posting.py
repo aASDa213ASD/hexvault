@@ -12,7 +12,7 @@ from src.ui.theme import HEXVAULT_THEME_COLORS
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-POSTING_DIR = ROOT_DIR / "var" / "posting"
+POSTING_DIR = ROOT_DIR / "intergration" / "posting"
 LCU_DIR = POSTING_DIR / "lcu"
 COLLECTION_DIR = LCU_DIR / "collection"
 ENV_PATH = LCU_DIR / "lcu.env"
@@ -180,6 +180,7 @@ from posting.config import Settings
 from posting.variables import load_variables, update_variables
 from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.widgets import Button
 
 
@@ -291,7 +292,11 @@ class HexvaultPostingScreen(MainScreen):
 
 
 class HexvaultPosting(Posting):
-    BINDINGS = [("q", "quit", "Quit")]
+    BINDINGS = [
+        Binding("ctrl+c", "ignore_ctrl_c", show=False, priority=True),
+        Binding("q", "quit", "Quit"),
+    ]
+
     CSS = """
     HexvaultPostingScreen {
         border: round $accent 40%;
@@ -320,6 +325,9 @@ class HexvaultPosting(Posting):
             environment_files=self.environment_files,
         )
         return self.main_screen
+
+    def action_ignore_ctrl_c(self) -> None:
+        pass
 
 
 def main() -> None:

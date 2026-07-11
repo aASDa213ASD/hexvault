@@ -9,7 +9,7 @@ from textual.widgets import Button, Checkbox, DataTable, Footer, Static, TabbedC
 
 from src.database.connection import init_db
 from src.lcu.client import get_current_summoner
-from src.lcu.posting import (
+from intergration.posting.posting import (
     prepare_lcu_posting_workspace,
     run_lcu_posting_foreground,
 )

@@ -8,4 +8,3 @@ class Endpoint(str, Enum):
     SKINS = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/skins.json"
     CURRENCY = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/lolcurrency.json"
     INVENTORY_TYPE = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/lolinventorytype.json"
-    
