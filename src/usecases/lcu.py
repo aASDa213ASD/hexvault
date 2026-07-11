@@ -50,7 +50,6 @@ def account_summary(account: Account) -> dict:
                     "league_points": queue.league_points,
                     "wins": queue.wins,
                     "losses": queue.losses,
-                    "icon_url": queue.icon_url,
                 }
             )
     return {
@@ -171,14 +170,7 @@ def save_current_account(
             session.delete(existing_account)
             session.flush()
 
-        account_image = (
-            existing_account.account_image_url
-            if existing_account
-            else current.get("account_image_url")
-        )
-        if not account_image:
-            account_image = PLACEHOLDER_ACCOUNT_IMAGE_URL
-        account = Account(account_image_url=account_image)
+        account = Account()
 
         resolved_login = existing_credentials.login if existing_credentials else login
         resolved_password = (
@@ -226,7 +218,6 @@ def save_current_account(
                         league_points=queue.get("league_points", 0),
                         wins=queue.get("wins", 0),
                         losses=queue.get("losses", 0),
-                        icon_url=queue.get("icon_url"),
                     )
                 )
             account.rank = rank
@@ -241,8 +232,6 @@ def save_current_account(
                         alias=champ.get("alias"),
                         name=champ.get("name"),
                         title=champ.get("title"),
-                        image_url=champ.get("image_url"),
-                        splash_url=champ.get("splash_url"),
                     )
                 )
             for skin in collection_payload.get("skins", []):
@@ -251,7 +240,6 @@ def save_current_account(
                         skin_id=skin.get("skin_id"),
                         name=skin.get("name"),
                         description=skin.get("description"),
-                        image_url=skin.get("image_url"),
                     )
                 )
             account.collection = collection
@@ -272,7 +260,6 @@ def save_current_account(
                         disenchant_value=shard.get("disenchant_value", 0),
                         upgrade_essence_value=shard.get("upgrade_essence_value", 0),
                         is_already_owned=bool(shard.get("is_already_owned")),
-                        image_url=shard.get("image_url"),
                     )
                 )
             for shard in loot_payload.get("skin_shards", []):
@@ -284,7 +271,6 @@ def save_current_account(
                         disenchant_value=shard.get("disenchant_value", 0),
                         upgrade_essence_value=shard.get("upgrade_essence_value", 0),
                         is_already_owned=bool(shard.get("is_already_owned")),
-                        image_url=shard.get("image_url"),
                     )
                 )
             account.loot = loot

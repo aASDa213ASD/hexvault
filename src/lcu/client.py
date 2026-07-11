@@ -12,15 +12,10 @@ import psutil
 
 from src.datadragon.client import (
     get_icon_url,
-    get_image_url,
-    get_rank_icon_url,
     get_skins_map,
 )
 from src.lcu.endpoints import Endpoint
 
-PLACEHOLDER_ACCOUNT_IMAGE_URL = (
-    "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/rewards/honor/milestone/images/honor_background_5.png"
-)
 APEX_RANK_TIERS = {
     "MASTER",
     "GRANDMASTER",
@@ -336,7 +331,6 @@ def get_current_account() -> dict | None:
                     "league_points": data.get("leaguePoints", 0),
                     "wins": data.get("wins", 0),
                     "losses": data.get("losses", 0),
-                    "icon_url": get_rank_icon_url(tier.lower()),
                 }
             )
 
@@ -344,7 +338,6 @@ def get_current_account() -> dict | None:
     loot = _build_loot(config)
 
     return {
-        "account_image_url": PLACEHOLDER_ACCOUNT_IMAGE_URL,
         "summoner": summoner,
         "verification": verification,
         "rank": {"ranked_queues": queues} if queues else None,
@@ -384,8 +377,6 @@ def _build_collection(config: LcuConfig) -> dict:
                 "alias": champ.get("alias"),
                 "name": champ.get("name"),
                 "title": champ.get("title"),
-                "image_url": get_image_url(champ.get("squarePortraitPath")),
-                "splash_url": get_image_url(champ.get("baseSplashPath")),
             }
         )
 
@@ -398,15 +389,13 @@ def _build_collection(config: LcuConfig) -> dict:
         if not meta:
             continue
         name = meta.get("name")
-        tile_path = meta.get("tilePath")
-        if not name or not tile_path:
+        if not name:
             continue
         skins.append(
             {
                 "skin_id": item_id,
                 "name": name,
                 "description": meta.get("description"),
-                "image_url": get_image_url(tile_path),
             }
         )
 
@@ -437,7 +426,6 @@ def _build_loot(config: LcuConfig) -> dict | None:
             "disenchant_value": shard.get("disenchantValue", 0),
             "upgrade_essence_value": shard.get("upgradeEssenceValue", 0),
             "is_already_owned": shard.get("itemStatus") == "OWNED",
-            "image_url": get_image_url(shard.get("tilePath")),
         }
         if shard_type in ("CHAMPION_RENTAL", "CHAMPION"):
             loot["champion_shards"].append(payload)

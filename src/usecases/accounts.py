@@ -5,11 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from src.database.connection import get_session
 from src.database.models import Account, Collection, Credentials, Loot, Rank
-from src.usecases.errors import NotFoundError, ValidationError
-
-PLACEHOLDER_ACCOUNT_IMAGE_URL = (
-    "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/rewards/honor/milestone/images/honor_background_5.png"
-)
+from src.usecases.errors import NotFoundError
 
 
 def _account_query():
@@ -31,7 +27,6 @@ def _account_query():
 def account_to_payload(account: Account) -> dict:
     return {
         "id": account.id,
-        "account_image_url": account.account_image_url,
         "credentials": {
             "login": account.credentials.login,
             "password": account.credentials.password,
@@ -68,7 +63,6 @@ def account_to_payload(account: Account) -> dict:
                     "league_points": rq.league_points,
                     "wins": rq.wins,
                     "losses": rq.losses,
-                    "icon_url": rq.icon_url,
                 }
                 for rq in account.rank.ranked_queues
             ]
@@ -82,8 +76,6 @@ def account_to_payload(account: Account) -> dict:
                     "alias": champ.alias,
                     "name": champ.name,
                     "title": champ.title,
-                    "image_url": champ.image_url,
-                    "splash_url": champ.splash_url,
                 }
                 for champ in account.collection.champions
             ],
@@ -92,7 +84,6 @@ def account_to_payload(account: Account) -> dict:
                     "skin_id": skin.skin_id,
                     "name": skin.name,
                     "description": skin.description,
-                    "image_url": skin.image_url,
                 }
                 for skin in account.collection.skins
             ],
@@ -111,7 +102,6 @@ def account_to_payload(account: Account) -> dict:
                     "disenchant_value": shard.disenchant_value,
                     "upgrade_essence_value": shard.upgrade_essence_value,
                     "is_already_owned": bool(shard.is_already_owned),
-                    "image_url": shard.image_url,
                 }
                 for shard in account.loot.champion_shards
             ],
@@ -123,7 +113,6 @@ def account_to_payload(account: Account) -> dict:
                     "disenchant_value": shard.disenchant_value,
                     "upgrade_essence_value": shard.upgrade_essence_value,
                     "is_already_owned": bool(shard.is_already_owned),
-                    "image_url": shard.image_url,
                 }
                 for shard in account.loot.skin_shards
             ],
@@ -147,26 +136,6 @@ def get_account(account_id: int) -> dict:
         if not account:
             raise NotFoundError("Account not found")
         return account_to_payload(account)
-
-
-def set_account_image(account_id: int, url: str) -> dict:
-    if not url:
-        raise ValidationError("Image url is required")
-    with get_session() as session:
-        account = session.execute(
-            select(Account).where(Account.id == account_id)
-        ).scalar_one_or_none()
-        if not account:
-            raise NotFoundError("Account not found")
-        account.account_image_url = url
-        session.add(account)
-        session.commit()
-        session.refresh(account)
-        return account_to_payload(account)
-
-
-def clear_account_image(account_id: int) -> dict:
-    return set_account_image(account_id, PLACEHOLDER_ACCOUNT_IMAGE_URL)
 
 
 def update_account_credentials(account_id: int, login: str, password: str) -> dict:
