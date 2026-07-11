@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import webbrowser
+from urllib.parse import quote
+
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
@@ -232,7 +235,7 @@ class AccountDetailScreen(Screen[bool | None]):
                             yield Button("Password", id="copy-password", compact=False)
                         with Vertical():
                             yield Button("IDs", id="copy-ids", compact=False)
-                            yield Button("OP.GG", id="copy-opgg", compact=False)
+                            yield Button("OP.GG", id="open-opgg", compact=False)
                 with Vertical(id="detail-profile-panel") as panel:
                     panel.border_title = "Profile"
                     yield from self._compose_overview_profile()
@@ -440,14 +443,11 @@ class AccountDetailScreen(Screen[bool | None]):
         credentials = self.account.get("credentials") or {}
         summoner = self.account.get("summoner") or {}
         copy_value = ""
-        success_label = ""
 
         if event.button.id == "copy-login":
             copy_value = str(credentials.get("login") or "")
-            success_label = "Login"
         elif event.button.id == "copy-password":
             copy_value = str(credentials.get("password") or "")
-            success_label = "Password"
         elif event.button.id == "copy-ids":
             ids = [
                 f"account_id: {str(summoner.get('summoner_account_id') or '-')}",
@@ -455,14 +455,19 @@ class AccountDetailScreen(Screen[bool | None]):
                 f"puuid: {str(summoner.get('puuid') or '-')}",
             ]
             copy_value = "\n".join(ids)
-            success_label = "IDs"
-        elif event.button.id == "copy-opgg":
+        elif event.button.id == "open-opgg":
             name = str(summoner.get("name") or "").strip()
             tag = str(summoner.get("tag") or "").strip()
             region = str(summoner.get("region") or "").strip()
-            if name and tag:
-                copy_value = f"https://dpm.lol/{name}-{tag}"
-            success_label = "OP.GG"
+            if name and tag and region:
+                url_name = quote(name, safe="")
+                url_tag = quote(tag, safe="")
+                url_region = quote(region.lower(), safe="")
+                webbrowser.open(
+                    f"https://op.gg/en/lol/summoners/{url_region}/{url_name}-{url_tag}",
+                    new=2,
+                )
+            return
         else:
             return
 
