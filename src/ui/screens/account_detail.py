@@ -68,9 +68,8 @@ class ConfirmAccountRemovalScreen(ModalScreen[bool]):
 
 class AccountDetailScreen(Screen[bool | None]):
     BINDINGS = [
-        ("escape", "close_screen", "back"),
-        ("q", "close_screen", "back"),
-        ("r", "remove_account", "forget account"),
+        ("q", "close_screen", "Back"),
+        ("r", "remove_account", "Forget account"),
     ]
     CSS = """
     #detail-root {
@@ -247,7 +246,7 @@ class AccountDetailScreen(Screen[bool | None]):
             
             with TabbedContent(initial="champions", classes="section", id="detail-items") as panel:
                 panel.border_title = "Items"
-                panel.border_subtitle = "Table of posessions on this account"
+                panel.border_subtitle = "Table of posessions"
                 with TabPane("Champions", id="champions"):
                     yield Input(
                         placeholder="Search champions...",
@@ -334,7 +333,7 @@ class AccountDetailScreen(Screen[bool | None]):
     def _populate_champions_table(self) -> None:
         table = self.query_one("#detail-champions-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("Champion ID", "Name", "Alias", "Title")
+        table.add_columns("Champion ID", "Name", "Alias", "Purchased")
         champions = self._filtered_champions()
         if not champions:
             table.add_row("-", "No champions found", "-", "-")
@@ -344,21 +343,22 @@ class AccountDetailScreen(Screen[bool | None]):
                 champion.get("champion_id") or "-",
                 champion.get("name") or "-",
                 champion.get("alias") or "-",
-                champion.get("title") or "-",
+                champion.get("purchased") or "-",
             )
 
     def _populate_skins_table(self) -> None:
         table = self.query_one("#detail-skins-table", DataTable)
         table.clear(columns=True)
-        table.add_columns("Skin ID", "Name")
+        table.add_columns("Skin ID", "Name", "Purchased")
         skins = self._filtered_skins()
         if not skins:
-            table.add_row("-", "No skins found")
+            table.add_row("-", "No skins found", "-")
             return
         for skin in skins:
             table.add_row(
                 skin.get("skin_id") or "-",
                 skin.get("name") or "-",
+                skin.get("purchased") or "-",
             )
 
     def _populate_loot_table(self) -> None:

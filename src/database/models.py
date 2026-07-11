@@ -199,8 +199,8 @@ class Champion(Base):
     name: Mapped[str] = mapped_column(
         String(255)
     )
-    title: Mapped[str] = mapped_column(
-        String(255)
+    purchased: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
     )
     collection_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("collections.id")
@@ -222,6 +222,9 @@ class Skin(Base):
         String(255)
     )
     description: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
+    )
+    purchased: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True
     )
     collection_id: Mapped[Optional[int]] = mapped_column(

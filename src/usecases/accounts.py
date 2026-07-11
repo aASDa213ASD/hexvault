@@ -75,7 +75,7 @@ def account_to_payload(account: Account) -> dict:
                     "champion_id": champ.champion_id,
                     "alias": champ.alias,
                     "name": champ.name,
-                    "title": champ.title,
+                    "purchased": champ.purchased,
                 }
                 for champ in account.collection.champions
             ],
@@ -84,6 +84,7 @@ def account_to_payload(account: Account) -> dict:
                     "skin_id": skin.skin_id,
                     "name": skin.name,
                     "description": skin.description,
+                    "purchased": skin.purchased,
                 }
                 for skin in account.collection.skins
             ],

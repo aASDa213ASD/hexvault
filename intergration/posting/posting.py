@@ -94,7 +94,7 @@ def refresh_lcu_posting_credentials() -> str:
             ),
             encoding="utf-8",
         )
-        return "FATAL: League Client not found, can not send requests to LCU and Riot API"
+        return "FATAL: League Client and Riot Client not found, can not send requests to LCU or Riot API"
 
     league_client = config.league_client
     riot_client = config.riot_client
@@ -204,7 +204,7 @@ def refresh_lcu_credentials() -> str:
             ),
             encoding="utf-8",
         )
-        return "LeagueClientUx.exe not found."
+        return "League Client and Riot Client not found."
 
     league_client = config.get("league_client")
     riot_client = config.get("riot_client")
@@ -229,10 +229,17 @@ def refresh_lcu_credentials() -> str:
 
 
 def _read_lcu_process_config() -> dict | None:
+    league_client = None
+    riot_client = None
+
     for process in psutil.process_iter(["name", "cmdline"]):
         try:
-            name = process.info.get("name") or ""
-            if name.lower() != "leagueclientux.exe":
+            name = (process.info.get("name") or "").lower()
+            if name not in {
+                "leagueclientux.exe",
+                "riot client.exe",
+                "riotclientservices.exe",
+            }:
                 continue
             args = process.info.get("cmdline") or []
         except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess):
@@ -245,26 +252,43 @@ def _read_lcu_process_config() -> dict | None:
             key, value = arg[2:].split("=", 1)
             values[key] = value
 
-        league_client = None
-        app_port = values.get("app-port")
-        remoting_auth_token = values.get("remoting-auth-token")
-        if app_port and remoting_auth_token:
-            league_client = {
-                "base_url": f"https://127.0.0.1:{app_port}",
-                "password": remoting_auth_token,
-            }
+        if name == "leagueclientux.exe" and league_client is None:
+            app_port = values.get("app-port")
+            remoting_auth_token = values.get("remoting-auth-token")
+            if app_port and remoting_auth_token:
+                league_client = {
+                    "base_url": f"https://127.0.0.1:{app_port}",
+                    "password": remoting_auth_token,
+                }
 
-        riot_client = None
-        riot_app_port = values.get("riotclient-app-port")
-        riot_auth_token = values.get("riotclient-auth-token")
-        if riot_app_port and riot_auth_token:
-            riot_client = {
-                "base_url": f"https://127.0.0.1:{riot_app_port}",
-                "password": riot_auth_token,
-            }
+        if riot_client is None and name == "leagueclientux.exe":
+            riot_app_port = values.get("riotclient-app-port")
+            riot_auth_token = values.get("riotclient-auth-token")
+            if riot_app_port and riot_auth_token:
+                riot_client = {
+                    "base_url": f"https://127.0.0.1:{riot_app_port}",
+                    "password": riot_auth_token,
+                }
 
-        if league_client or riot_client:
-            return {"league_client": league_client, "riot_client": riot_client}
+        if riot_client is None and name != "leagueclientux.exe":
+            app_port = values.get("app-port")
+            remoting_auth_token = values.get("remoting-auth-token")
+            if app_port and remoting_auth_token:
+                riot_client = {
+                    "base_url": f"https://127.0.0.1:{app_port}",
+                    "password": remoting_auth_token,
+                }
+            else:
+                riot_app_port = values.get("riotclient-app-port")
+                riot_auth_token = values.get("riotclient-auth-token")
+                if riot_app_port and riot_auth_token:
+                    riot_client = {
+                        "base_url": f"https://127.0.0.1:{riot_app_port}",
+                        "password": riot_auth_token,
+                    }
+
+    if league_client or riot_client:
+        return {"league_client": league_client, "riot_client": riot_client}
     return None
 
 

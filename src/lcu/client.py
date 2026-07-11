@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import psutil
 import base64
 import json
 import ssl
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
-import psutil
 
 from src.datadragon.client import (
     get_icon_url,
@@ -17,91 +18,131 @@ from src.datadragon.client import (
 )
 from src.lcu.endpoints import Endpoint
 
+
 APEX_RANK_TIERS = {
     "MASTER",
     "GRANDMASTER",
     "CHALLENGER"
 }
 
+LEAGUE_CLIENT_PROCESS = "leagueclientux.exe"
+RIOT_CLIENT_PROCESSES = {
+    "riot client.exe",
+    "riotclientservices.exe",
+}
+
 
 @dataclass
-class LcuConfig:
+class LCUConfig:
     base_url: str
     password: str
 
 
 @dataclass
-class LcuProcessConfig:
-    league_client: LcuConfig | None
-    riot_client: LcuConfig | None
+class LCUProcessConfig:
+    league_client: LCUConfig | None
+    riot_client: LCUConfig | None
     region: str | None = None
 
 
-def _read_lcu_process_config() -> LcuProcessConfig | None:
+def _read_lcu_process_config() -> LCUProcessConfig | None:
+    league_client: LCUConfig | None = None
+    riot_client: LCUConfig | None = None
+    region: str | None = None
+
     for process in psutil.process_iter(["name", "cmdline"]):
         try:
-            name = process.info.get("name") or ""
-            if name.lower() != "leagueclientux.exe":
+            process_name = (process.info.get("name") or "").lower()
+            if process_name not in {LEAGUE_CLIENT_PROCESS, *RIOT_CLIENT_PROCESSES}:
                 continue
 
             args = process.info.get("cmdline") or []
         except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess):
             continue
 
-        values: dict[str, str] = {}
-        for arg in args:
-            if not arg.startswith("--") or "=" not in arg:
-                continue
-            key, value = arg[2:].split("=", 1)
-            values[key] = value
+        values = _parse_process_args(args)
+        region = region or (values.get("region") or "").lower() or None
 
-        league_client = None
-        app_port = values.get("app-port")
-        remoting_auth_token = values.get("remoting-auth-token")
-        if app_port and remoting_auth_token:
-            league_client = LcuConfig(
-                base_url=f"https://127.0.0.1:{app_port}",
-                password=remoting_auth_token,
+        if process_name == LEAGUE_CLIENT_PROCESS and league_client is None:
+            league_client = _config_from_values(
+                values,
+                port_key="app-port",
+                password_key="remoting-auth-token",
             )
 
-        riot_client = None
-        riot_app_port = values.get("riotclient-app-port")
-        riot_auth_token = values.get("riotclient-auth-token")
-        if riot_app_port and riot_auth_token:
-            riot_client = LcuConfig(
-                base_url=f"https://127.0.0.1:{riot_app_port}",
-                password=riot_auth_token,
-            )
+        if riot_client is None:
+            if process_name == LEAGUE_CLIENT_PROCESS:
+                riot_client = _config_from_values(
+                    values,
+                    port_key="riotclient-app-port",
+                    password_key="riotclient-auth-token",
+                )
+            else:
+                riot_client = _config_from_values(
+                    values,
+                    port_key="app-port",
+                    password_key="remoting-auth-token",
+                ) or _config_from_values(
+                    values,
+                    port_key="riotclient-app-port",
+                    password_key="riotclient-auth-token",
+                )
 
-        if league_client or riot_client:
-            return LcuProcessConfig(
-                league_client=league_client,
-                riot_client=riot_client,
-                region=(values.get("region") or "").lower() or None,
-            )
+    if league_client or riot_client:
+        return LCUProcessConfig(
+            league_client=league_client,
+            riot_client=riot_client,
+            region=region,
+        )
 
     return None
 
 
-def _read_lcu_process() -> LcuConfig | None:
+def _parse_process_args(args: list[str]) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for arg in args:
+        if not arg.startswith("--") or "=" not in arg:
+            continue
+        key, value = arg[2:].split("=", 1)
+        values[key] = value
+    return values
+
+
+def _config_from_values(
+    values: dict[str, str],
+    *,
+    port_key: str,
+    password_key: str,
+) -> LCUConfig | None:
+    port = values.get(port_key)
+    password = values.get(password_key)
+    if not port or not password:
+        return None
+    return LCUConfig(
+        base_url=f"https://127.0.0.1:{port}",
+        password=password,
+    )
+
+
+def _read_lcu_process() -> LCUConfig | None:
     config = _read_lcu_process_config()
     return config.league_client if config else None
 
 
-def get_lcu_config() -> LcuConfig | None:
+def get_lcu_config() -> LCUConfig | None:
     return _read_lcu_process()
 
 
-def get_riot_client_config() -> LcuConfig | None:
+def get_riot_client_config() -> LCUConfig | None:
     config = _read_lcu_process_config()
     return config.riot_client if config else None
 
 
-def get_lcu_process_config() -> LcuProcessConfig | None:
+def get_lcu_process_config() -> LCUProcessConfig | None:
     return _read_lcu_process_config()
 
 
-def _request(config: LcuConfig, path: str) -> Any:
+def _request(config: LCUConfig, path: str) -> Any:
     if hasattr(path, "value"):
         path = path.value
 
@@ -121,9 +162,8 @@ def _request(config: LcuConfig, path: str) -> Any:
         return None
 
 
-
 def _request_json(
-    config: LcuConfig, method: str, path: str, payload: dict | None = None
+    config: LCUConfig, method: str, path: str, payload: dict | None = None
 ) -> tuple[int | None, Any]:
     if hasattr(path, "value"):
         path = path.value
@@ -182,10 +222,40 @@ def _parse_rank_division(tier: str, value: str | None) -> str | None:
     return normalized_value
 
 
+def _format_lcu_timestamp(value: int | float | str | None) -> str | None:
+    if value in (None, ""): return None
+    
+    if isinstance(value, str):
+        normalized = value.strip()
+        if not normalized: return None
+        
+        for date_format in ("%Y%m%dT%H%M%S.%fZ", "%Y%m%dT%H%M%SZ"):
+            try:
+                parsed = datetime.strptime(normalized, date_format)
+                return parsed.replace(tzinfo=timezone.utc).strftime(
+                    "%Y-%m-%d %H:%M:%S UTC"
+                )
+            except ValueError:
+                pass
+    try:
+        timestamp = float(value)
+    except (TypeError, ValueError):
+        return None
+    
+    if timestamp <= 0:
+        return None
+    
+    if timestamp > 10_000_000_000:
+        timestamp /= 1000
+    
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime(
+        "%Y-%m-%d %H:%M:%S UTC"
+    )
+
+
 def clear_challenges_preferences() -> dict | None:
     config = _read_lcu_process()
-    if not config:
-        return None
+    if not config: return None
 
     status, payload = _request_json(
         config,
@@ -193,8 +263,7 @@ def clear_challenges_preferences() -> dict | None:
         Endpoint.CHALLENGES_PLAYER_PREFERENCES,
         {"challengeIds": []},
     )
-    if status is None:
-        return None
+    if status is None: return None
     
     return {
         "status": status,
@@ -205,8 +274,7 @@ def clear_challenges_preferences() -> dict | None:
 
 def set_current_summoner_icon(profile_icon_id: int) -> dict | None:
     config = _read_lcu_process()
-    if not config:
-        return None
+    if not config: return None
 
     status, payload = _request_json(
         config,
@@ -214,8 +282,7 @@ def set_current_summoner_icon(profile_icon_id: int) -> dict | None:
         Endpoint.CURRENT_SUMMONER_ICON,
         {"profileIconId": profile_icon_id},
     )
-    if status is None:
-        return None
+    if status is None: return None
 
     return {
         "status": status,
@@ -226,12 +293,10 @@ def set_current_summoner_icon(profile_icon_id: int) -> dict | None:
 
 def get_matchmaking_search_state() -> str | None:
     config = _read_lcu_process()
-    if not config:
-        return None
+    if not config: return None
     
     payload = _request(config, Endpoint.MATCHMAKING_SEARCH_STATE)
-    if not isinstance(payload, dict):
-        return None
+    if not isinstance(payload, dict): return None
     
     value = payload.get("searchState")
     return value if isinstance(value, str) else None
@@ -247,16 +312,14 @@ def is_match_searching() -> bool:
 
 def accept_ready_check() -> dict | None:
     config = _read_lcu_process()
-    if not config:
-        return None
+    if not config: return None
 
     status, payload = _request_json(
         config,
         "POST",
         Endpoint.READY_CHECK_ACCEPT,
     )
-    if status is None:
-        return None
+    if status is None: return None
 
     return {
         "status": status,
@@ -267,8 +330,7 @@ def accept_ready_check() -> dict | None:
 
 def dodge_champ_select() -> dict | None:
     config = _read_lcu_process()
-    if not config:
-        return None
+    if not config: return None
 
     status, payload = _request_json(
         config,
@@ -276,8 +338,8 @@ def dodge_champ_select() -> dict | None:
         Endpoint.DODGE_CHAMP_SELECT,
         {},
     )
-    if status is None:
-        return None
+    if status is None: return None
+
     return {
         "status": status,
         "ok": status in (200, 201, 204),
@@ -287,14 +349,12 @@ def dodge_champ_select() -> dict | None:
 
 def get_current_account() -> dict | None:
     config = _read_lcu_process()
-    if not config:
-        return None
+    if not config: return None
 
     current = _request(config, Endpoint.CURRENT_SUMMONER)
     riot_config = get_riot_client_config()
     region_data = _request(riot_config or config, Endpoint.CURRENT_REGION)
-    if not current or not region_data:
-        return None
+    if not current or not region_data: return None
 
     summoner = {
         "summoner_account_id": current.get("accountId"),
@@ -348,12 +408,10 @@ def get_current_account() -> dict | None:
 
 def get_current_summoner() -> dict | None:
     config = _read_lcu_process()
-    if not config:
-        return None
+    if not config: return None
 
     current = _request(config, Endpoint.CURRENT_SUMMONER)
-    if not current:
-        return None
+    if not current: return None
 
     summoner = {
         "name": current.get("gameName"),
@@ -365,7 +423,7 @@ def get_current_summoner() -> dict | None:
 
     return summoner
 
-def _build_collection(config: LcuConfig) -> dict:
+def _build_collection(config: LCUConfig) -> dict:
     champions = []
     champions_owned = _request(config, Endpoint.OWNED_CHAMPIONS) or []
     champions_map = get_champions_map()
@@ -379,7 +437,7 @@ def _build_collection(config: LcuConfig) -> dict:
             "champion_id": champion_id,
             "alias": meta.get("alias"),
             "name": meta.get("name"),
-            "title": meta.get("title"),
+            "purchased": _format_lcu_timestamp(champion.get("purchased")),
         })
 
     skins = []
@@ -392,20 +450,21 @@ def _build_collection(config: LcuConfig) -> dict:
 
         name = meta.get("name")
         if not name: continue
-        
+
         skins.append({
             "skin_id": item_id,
             "name": name,
             "description": meta.get("description"),
+            "purchased": _format_lcu_timestamp(skin.get("purchaseDate")),
         })
 
     return {"champions": champions, "skins": skins}
 
 
-def _build_loot(config: LcuConfig) -> dict | None:
+def _build_loot(config: LCUConfig) -> dict | None:
     wallet = _request(config, Endpoint.CURRENT_WALLET) or {}
-    if not wallet:
-        return None
+    if not wallet: return None
+
     loot = {
         "blue_essence": wallet.get("lol_blue_essence", 0),
         "orange_essence": wallet.get("lol_orange_essence", 0),
@@ -419,6 +478,7 @@ def _build_loot(config: LcuConfig) -> dict | None:
         shard_type = shard.get("type")
         if shard_type not in ("CHAMPION_RENTAL", "CHAMPION", "SKIN_RENTAL", "SKIN"):
             continue
+
         payload = {
             "type": shard_type,
             "name": shard.get("itemDesc"),

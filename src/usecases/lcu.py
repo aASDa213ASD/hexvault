@@ -231,7 +231,7 @@ def save_current_account(
                         champion_id=champ.get("champion_id"),
                         alias=champ.get("alias"),
                         name=champ.get("name"),
-                        title=champ.get("title"),
+                        purchased=champ.get("purchased"),
                     )
                 )
             for skin in collection_payload.get("skins", []):
@@ -240,6 +240,7 @@ def save_current_account(
                         skin_id=skin.get("skin_id"),
                         name=skin.get("name"),
                         description=skin.get("description"),
+                        purchased=skin.get("purchased"),
                     )
                 )
             account.collection = collection
