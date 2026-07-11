@@ -407,9 +407,7 @@ class AccountDetailScreen(Screen[bool | None]):
         return [
             champion
             for champion in champions
-            if query in (champion.get("name") or "").lower()
-            or query in (champion.get("alias") or "").lower()
-            or query in (champion.get("title") or "").lower()
+            if query in (champion.get("alias") or "").lower()
         ]
 
     def _filtered_skins(self) -> list[dict]:
@@ -421,7 +419,6 @@ class AccountDetailScreen(Screen[bool | None]):
             skin
             for skin in skins
             if query in (skin.get("name") or "").lower()
-            or query in (skin.get("description") or "").lower()
         ]
 
     def on_input_changed(self, event: Input.Changed) -> None:
