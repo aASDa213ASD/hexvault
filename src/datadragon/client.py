@@ -56,3 +56,18 @@ def get_skins_map() -> dict:
     except Exception:
         return {}
     return {}
+
+
+@lru_cache(maxsize=1)
+def get_champions_map() -> dict:
+    try:
+        data = _fetch_json(Endpoint.CHAMPIONS)
+        if isinstance(data, list):
+            return {
+                champion["id"]: champion
+                for champion in data
+                if isinstance(champion, dict) and "id" in champion
+            }
+    except Exception:
+        return {}
+    return {}

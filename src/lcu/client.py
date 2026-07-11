@@ -13,6 +13,7 @@ import psutil
 from src.datadragon.client import (
     get_icon_url,
     get_skins_map,
+    get_champions_map,
 )
 from src.lcu.endpoints import Endpoint
 
@@ -366,19 +367,20 @@ def get_current_summoner() -> dict | None:
 
 def _build_collection(config: LcuConfig) -> dict:
     champions = []
-    owned_champions = _request(config, Endpoint.OWNED_CHAMPIONS) or []
-    for champ in owned_champions:
-        ownership = champ.get("ownership") or {}
-        if not ownership.get("owned"):
-            continue
-        champions.append(
-            {
-                "champion_id": champ.get("id"),
-                "alias": champ.get("alias"),
-                "name": champ.get("name"),
-                "title": champ.get("title"),
-            }
-        )
+    champions_owned = _request(config, Endpoint.OWNED_CHAMPIONS) or []
+    champions_map = get_champions_map()
+    for champion in champions_owned:
+        ownership = champion.get("ownership") or {}
+        if not ownership.get("owned"): continue
+        champion_id = champion.get("id")
+        meta = champions_map.get(champion_id) or champion
+
+        champions.append({
+            "champion_id": champion_id,
+            "alias": meta.get("alias"),
+            "name": meta.get("name"),
+            "title": meta.get("title"),
+        })
 
     skins = []
     owned_skins = _request(config, Endpoint.OWNED_SKINS) or []
@@ -386,18 +388,16 @@ def _build_collection(config: LcuConfig) -> dict:
     for skin in owned_skins:
         item_id = skin.get("itemId")
         meta = skins_map.get(str(item_id))
-        if not meta:
-            continue
+        if not meta: continue
+
         name = meta.get("name")
-        if not name:
-            continue
-        skins.append(
-            {
-                "skin_id": item_id,
-                "name": name,
-                "description": meta.get("description"),
-            }
-        )
+        if not name: continue
+        
+        skins.append({
+            "skin_id": item_id,
+            "name": name,
+            "description": meta.get("description"),
+        })
 
     return {"champions": champions, "skins": skins}
 
