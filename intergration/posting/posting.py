@@ -82,16 +82,14 @@ def refresh_lcu_posting_credentials() -> str:
     LCU_DIR.mkdir(parents=True, exist_ok=True)
 
     if not config:
-        ENV_PATH.write_text(
-            "\n".join(
-                [
-                    "LCU_BASE_URL=https://127.0.0.1:0",
-                    "LCU_PASSWORD=",
-                    "RIOT_CLIENT_BASE_URL=https://127.0.0.1:0",
-                    "RIOT_CLIENT_PASSWORD=",
-                    "",
-                ]
-            ),
+        ENV_PATH.write_text("\n".join(
+            [
+                "LCU_BASE_URL=https://127.0.0.1:0",
+                "LCU_PASSWORD=",
+                "RIOT_CLIENT_BASE_URL=https://127.0.0.1:0",
+                "RIOT_CLIENT_PASSWORD=",
+                "",
+            ]),
             encoding="utf-8",
         )
         return "FATAL: League Client and Riot Client not found, can not send requests to LCU or Riot API"
@@ -100,67 +98,65 @@ def refresh_lcu_posting_credentials() -> str:
     riot_client = config.riot_client
 
     ENV_PATH.write_text(
-        "\n".join(
-            [
-                f"LCU_BASE_URL={league_client.base_url if league_client else 'https://127.0.0.1:0'}",
-                f"LCU_PASSWORD={league_client.password if league_client else ''}",
-                f"RIOT_CLIENT_BASE_URL={riot_client.base_url if riot_client else 'https://127.0.0.1:0'}",
-                f"RIOT_CLIENT_PASSWORD={riot_client.password if riot_client else ''}",
-                "",
-            ]
-        ),
+        "\n".join([
+            f"LCU_BASE_URL={league_client.base_url if league_client else 'https://127.0.0.1:0'}",
+            f"LCU_PASSWORD={league_client.password if league_client else ''}",
+            f"RIOT_CLIENT_BASE_URL={riot_client.base_url if riot_client else 'https://127.0.0.1:0'}",
+            f"RIOT_CLIENT_PASSWORD={riot_client.password if riot_client else ''}",
+            "",
+        ]),
         encoding="utf-8",
     )
 
     loaded = []
     if league_client:
         loaded.append(f"LCU {league_client.base_url}")
+    
     if riot_client:
         loaded.append(f"Riot Client {riot_client.base_url}")
+    
     return "Credentials loaded for " + ", ".join(loaded) + "."
 
 
 def _write_launcher() -> None:
     LCU_DIR.mkdir(parents=True, exist_ok=True)
     LAUNCHER_PATH.write_text(
-        "\n".join(
-            [
-                "@echo off",
-                "setlocal",
-                'set "LCU_DIR=%~dp0"',
-                'for %%I in ("%LCU_DIR%..") do set "POSTING_DIR=%%~fI"',
-                'for %%I in ("%LCU_DIR%..\\..\\..") do set "ROOT_DIR=%%~fI"',
-                'set "RUNTIME_DIR=%POSTING_DIR%\\runtime"',
-                'set "RUNTIME_PYTHON=%RUNTIME_DIR%\\Scripts\\python.exe"',
-                'set "COLLECTION_DIR=%LCU_DIR%collection"',
-                'set "ENV_PATH=%LCU_DIR%lcu.env"',
-                'set "POSTING_CONFIG_FILE=%LCU_DIR%posting-config.yaml"',
-                'cd /d "%ROOT_DIR%"',
-                'if not exist "%RUNTIME_PYTHON%" (',
-                "  echo Creating isolated Posting runtime...",
-                '  if defined HEXVAULT_PYTHON "%HEXVAULT_PYTHON%" -m venv "%RUNTIME_DIR%"',
-                "  if errorlevel 1 if defined HEXVAULT_PYTHON goto :error",
-                '  if not defined HEXVAULT_PYTHON py -3 -m venv "%RUNTIME_DIR%"',
-                "  if errorlevel 1 python -m venv \"%RUNTIME_DIR%\"",
-                "  if errorlevel 1 goto :error",
-                ")",
-                '"%RUNTIME_PYTHON%" -m pip show posting >nul 2>nul',
-                "set POSTING_MISSING=%errorlevel%",
-                '"%RUNTIME_PYTHON%" -m pip show psutil >nul 2>nul',
-                "set PSUTIL_MISSING=%errorlevel%",
-                "if not \"%POSTING_MISSING%%PSUTIL_MISSING%\"==\"00\" (",
-                f'  "%RUNTIME_PYTHON%" -m pip install posting=={POSTING_VERSION} psutil^>=7.0.0',
-                "  if errorlevel 1 goto :error",
-                ")",
-                '"%RUNTIME_PYTHON%" "%LCU_DIR%run-posting.py"',
-                "goto :done",
-                ":error",
-                "echo Failed to start Posting.",
-                "pause",
-                ":done",
-                "endlocal",
-            ]
-        ),
+        "\n".join([
+            "@echo off",
+            "setlocal",
+            'set "LCU_DIR=%~dp0"',
+            'for %%I in ("%LCU_DIR%..") do set "POSTING_DIR=%%~fI"',
+            'for %%I in ("%LCU_DIR%..\\..\\..") do set "ROOT_DIR=%%~fI"',
+            'set "RUNTIME_DIR=%POSTING_DIR%\\runtime"',
+            'set "RUNTIME_PYTHON=%RUNTIME_DIR%\\Scripts\\python.exe"',
+            'set "COLLECTION_DIR=%LCU_DIR%collection"',
+            'set "ENV_PATH=%LCU_DIR%lcu.env"',
+            'set "POSTING_CONFIG_FILE=%LCU_DIR%posting-config.yaml"',
+            'cd /d "%ROOT_DIR%"',
+            'if not exist "%RUNTIME_PYTHON%" (',
+            "  echo Creating isolated Posting runtime...",
+            '  if defined HEXVAULT_PYTHON "%HEXVAULT_PYTHON%" -m venv "%RUNTIME_DIR%"',
+            "  if errorlevel 1 if defined HEXVAULT_PYTHON goto :error",
+            '  if not defined HEXVAULT_PYTHON py -3 -m venv "%RUNTIME_DIR%"',
+            "  if errorlevel 1 python -m venv \"%RUNTIME_DIR%\"",
+            "  if errorlevel 1 goto :error",
+            ")",
+            '"%RUNTIME_PYTHON%" -m pip show posting >nul 2>nul',
+            "set POSTING_MISSING=%errorlevel%",
+            '"%RUNTIME_PYTHON%" -m pip show psutil >nul 2>nul',
+            "set PSUTIL_MISSING=%errorlevel%",
+            "if not \"%POSTING_MISSING%%PSUTIL_MISSING%\"==\"00\" (",
+            f'  "%RUNTIME_PYTHON%" -m pip install posting=={POSTING_VERSION} psutil^>=7.0.0',
+            "  if errorlevel 1 goto :error",
+            ")",
+            '"%RUNTIME_PYTHON%" "%LCU_DIR%run-posting.py"',
+            "goto :done",
+            ":error",
+            "echo Failed to start Posting.",
+            "pause",
+            ":done",
+            "endlocal",
+        ]),
         encoding="utf-8",
     )
 
@@ -193,15 +189,13 @@ def refresh_lcu_credentials() -> str:
     config = _read_lcu_process_config()
     if not config:
         ENV_PATH.write_text(
-            "\n".join(
-                [
+            "\n".join([
                     "LCU_BASE_URL=https://127.0.0.1:0",
                     "LCU_PASSWORD=",
                     "RIOT_CLIENT_BASE_URL=https://127.0.0.1:0",
                     "RIOT_CLIENT_PASSWORD=",
                     "",
-                ]
-            ),
+            ]),
             encoding="utf-8",
         )
         return "League Client and Riot Client not found."
@@ -209,22 +203,22 @@ def refresh_lcu_credentials() -> str:
     league_client = config.get("league_client")
     riot_client = config.get("riot_client")
     ENV_PATH.write_text(
-        "\n".join(
-            [
+        "\n".join([
                 f"LCU_BASE_URL={league_client['base_url'] if league_client else 'https://127.0.0.1:0'}",
                 f"LCU_PASSWORD={league_client['password'] if league_client else ''}",
                 f"RIOT_CLIENT_BASE_URL={riot_client['base_url'] if riot_client else 'https://127.0.0.1:0'}",
                 f"RIOT_CLIENT_PASSWORD={riot_client['password'] if riot_client else ''}",
                 "",
-            ]
-        ),
+        ]),
         encoding="utf-8",
     )
     loaded = []
     if league_client:
         loaded.append(f"LCU {league_client['base_url']}")
+    
     if riot_client:
         loaded.append(f"Riot Client {riot_client['base_url']}")
+    
     return "Credentials loaded for " + ", ".join(loaded) + "."
 
 
@@ -375,60 +369,56 @@ def _write_theme_files() -> None:
     THEMES_DIR.mkdir(parents=True, exist_ok=True)
     theme_directory = _relative_to_root(THEMES_DIR)
     CONFIG_PATH.write_text(
-        "\n".join(
-            [
-                "theme: hexvault",
-                f'theme_directory: "{theme_directory}"',
-                "load_user_themes: true",
-                "load_builtin_themes: true",
-                "spacing: standard",
-                "heading:",
-                "  visible: false",
-                "  show_version: false",
-                "  show_host: false",
-                "watch_themes: true",
-                "watch_env_files: true",
-                "watch_collection_files: true",
-                "",
-            ]
-        ),
+        "\n".join([
+            "theme: hexvault",
+            f'theme_directory: "{theme_directory}"',
+            "load_user_themes: true",
+            "load_builtin_themes: true",
+            "spacing: standard",
+            "heading:",
+            "  visible: false",
+            "  show_version: false",
+            "  show_host: false",
+            "watch_themes: true",
+            "watch_env_files: true",
+            "watch_collection_files: true",
+            "",
+        ]),
         encoding="utf-8",
     )
     THEME_PATH.write_text(
-        "\n".join(
-            [
-                "name: hexvault",
-                f"primary: '{HEXVAULT_THEME_COLORS['primary']}'",
-                f"secondary: '{HEXVAULT_THEME_COLORS['secondary']}'",
-                f"accent: '{HEXVAULT_THEME_COLORS['accent']}'",
-                f"background: '{HEXVAULT_THEME_COLORS['background']}'",
-                f"surface: '{HEXVAULT_THEME_COLORS['surface']}'",
-                f"panel: '{HEXVAULT_THEME_COLORS['panel']}'",
-                f"warning: '{HEXVAULT_THEME_COLORS['warning']}'",
-                f"error: '{HEXVAULT_THEME_COLORS['error']}'",
-                f"success: '{HEXVAULT_THEME_COLORS['success']}'",
-                "dark: true",
-                "text_area:",
-                "  gutter: 'dim'",
-                f"  cursor: 'reverse {HEXVAULT_THEME_COLORS['primary']}'",
-                f"  cursor_line: 'on {HEXVAULT_THEME_COLORS['surface']}'",
-                f"  selection: 'on {HEXVAULT_THEME_COLORS['secondary']}'",
-                "syntax:",
-                f"  json_key: '{HEXVAULT_THEME_COLORS['primary']}'",
-                f"  json_string: '{HEXVAULT_THEME_COLORS['success']}'",
-                f"  json_number: '{HEXVAULT_THEME_COLORS['warning']}'",
-                f"  json_boolean: '{HEXVAULT_THEME_COLORS['secondary']}'",
-                f"  json_null: '{HEXVAULT_THEME_COLORS['error']}'",
-                "url:",
-                f"  base: '{HEXVAULT_THEME_COLORS['secondary']}'",
-                f"  protocol: 'bold {HEXVAULT_THEME_COLORS['accent']}'",
-                "  separator: 'dim'",
-                "variable:",
-                f"  resolved: '{HEXVAULT_THEME_COLORS['success']}'",
-                f"  unresolved: '{HEXVAULT_THEME_COLORS['error']}'",
-                "",
-            ]
-        ),
+        "\n".join([
+            "name: hexvault",
+            f"primary: '{HEXVAULT_THEME_COLORS['primary']}'",
+            f"secondary: '{HEXVAULT_THEME_COLORS['secondary']}'",
+            f"accent: '{HEXVAULT_THEME_COLORS['accent']}'",
+            f"background: '{HEXVAULT_THEME_COLORS['background']}'",
+            f"surface: '{HEXVAULT_THEME_COLORS['surface']}'",
+            f"panel: '{HEXVAULT_THEME_COLORS['panel']}'",
+            f"warning: '{HEXVAULT_THEME_COLORS['warning']}'",
+            f"error: '{HEXVAULT_THEME_COLORS['error']}'",
+            f"success: '{HEXVAULT_THEME_COLORS['success']}'",
+            "dark: true",
+            "text_area:",
+            "  gutter: 'dim'",
+            f"  cursor: 'reverse {HEXVAULT_THEME_COLORS['primary']}'",
+            f"  cursor_line: 'on {HEXVAULT_THEME_COLORS['surface']}'",
+            f"  selection: 'on {HEXVAULT_THEME_COLORS['secondary']}'",
+            "syntax:",
+            f"  json_key: '{HEXVAULT_THEME_COLORS['primary']}'",
+            f"  json_string: '{HEXVAULT_THEME_COLORS['success']}'",
+            f"  json_number: '{HEXVAULT_THEME_COLORS['warning']}'",
+            f"  json_boolean: '{HEXVAULT_THEME_COLORS['secondary']}'",
+            f"  json_null: '{HEXVAULT_THEME_COLORS['error']}'",
+            "url:",
+            f"  base: '{HEXVAULT_THEME_COLORS['secondary']}'",
+            f"  protocol: 'bold {HEXVAULT_THEME_COLORS['accent']}'",
+            "  separator: 'dim'",
+            "variable:",
+            f"  resolved: '{HEXVAULT_THEME_COLORS['success']}'",
+            f"  unresolved: '{HEXVAULT_THEME_COLORS['error']}'",
+            "",
+        ]),
         encoding="utf-8",
     )
 

@@ -51,6 +51,7 @@ def get_random_rank_icon(
 
     if normalized_min not in RANK_TIERS:
         raise ValidationError(f"Unknown min_tier: {min_tier}")
+    
     if normalized_max not in RANK_TIERS:
         raise ValidationError(f"Unknown max_tier: {max_tier}")
 

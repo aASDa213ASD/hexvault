@@ -38,6 +38,7 @@ from src.usecases.lcu import (
     save_current_account,
 )
 
+
 RANKS_DIR = Path(__file__).resolve().parents[3] / "resources" / "ranks"
 
 
@@ -58,6 +59,7 @@ class Hexvault(App):
                             panel.border_title = "Vault"
                             panel.border_subtitle = "Enter to open the account"
                             yield DataTable(id="accounts-table")
+                        
                         with Vertical(id="accounts-sidebar"):
                             with VerticalScroll(id="selected-account-panel", classes="section") as panel:
                                 panel.border_title = "Selected account"
@@ -112,6 +114,7 @@ class Hexvault(App):
                                         with Horizontal(classes="summary-item right"):
                                             yield Static("Skins", classes="summary-label")
                                             yield Static("-", classes="summary-value", id="skins-count")
+                            
                             with Vertical(id="connected-client", classes="section") as panel:
                                 panel.border_title = "Connected client"
                                 with Horizontal(id="client-hero"):
@@ -139,6 +142,7 @@ class Hexvault(App):
                                         id="lcu-sync",
                                         classes="client-sync-button",
                                     )
+                
                 with TabPane("Client", id="lcu"):
                     with Vertical(id="posting-tab", classes="section single-panel") as panel:
                         panel.border_title = "League Client"
@@ -154,6 +158,7 @@ class Hexvault(App):
                                 id="open-posting-here",
                                 classes="posting-action",
                             )
+                
                 with TabPane("Settings", id="settings"):
                     with Vertical(classes="section single-panel") as panel:
                         panel.border_title = "Privacy"
@@ -198,11 +203,13 @@ class Hexvault(App):
                                     compact=True,
                                     classes="setting-toggle",
                                 )
+                
                 with TabPane("Health", id="health"):
                     with Vertical(classes="section single-panel") as panel:
                         panel.border_title = "Health"
                         panel.border_subtitle = "Dependencies"
                         yield Static(id="health-status", classes="status-copy")
+        
         yield Footer()
 
     def on_mount(self) -> None:
@@ -275,10 +282,12 @@ class Hexvault(App):
     def _format_summoner_name(self, summoner: dict) -> str:
         if self._is_hide_names_enabled():
             return fake_username_for_summoner(summoner)
+        
         name = summoner.get("name")
         tag = summoner.get("tag")
         if name and tag:
             return f"{name}#{tag}"
+        
         return name or "-"
 
     def _is_hide_names_enabled(self) -> bool:
@@ -341,17 +350,20 @@ class Hexvault(App):
         rank_path = RANKS_DIR / f"{rank_name}.png"
         if rank_path.exists():
             return rank_path
+        
         fallback_path = RANKS_DIR / "unranked.png"
         return fallback_path if fallback_path.exists() else None
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if event.cursor_row < 0 or event.cursor_row >= len(self._accounts):
             return
+        
         self._show_account_details(self._accounts[event.cursor_row])
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if event.cursor_row < 0 or event.cursor_row >= len(self._accounts):
             return
+        
         self.push_screen(
             AccountDetailScreen(
                 self._accounts[event.cursor_row],
@@ -371,8 +383,8 @@ class Hexvault(App):
             "setting-hide-names",
             "setting-hide-regions",
             "setting-randomize-ranks",
-        }:
-            return
+        }: return
+
         selected_row = self.query_one("#accounts-table", DataTable).cursor_row
         self._populate_accounts_table()
         if 0 <= selected_row < len(self._accounts):
@@ -396,6 +408,7 @@ class Hexvault(App):
         if not summoner:
             self.query_one("#lcu-status", Static).update("Not connected")
             return
+        
         self.query_one("#lcu-status", Static).update(
             f"Welcome back, {summoner.get('name')}#{summoner.get('tag')}"
         )
@@ -411,6 +424,7 @@ class Hexvault(App):
 
         if event.button.id != "lcu-sync":
             return
+        
         self._sync_current_account()
 
     def _sync_current_account(self) -> None:

@@ -53,6 +53,7 @@ class AccountCredentialsScreen(ModalScreen[tuple[str, str] | None]):
         if event.button.id == "credentials-cancel":
             self.dismiss(None)
             return
+        
         if event.button.id == "credentials-save":
             self._submit()
 
@@ -67,4 +68,5 @@ class AccountCredentialsScreen(ModalScreen[tuple[str, str] | None]):
                 "Login and password are required."
             )
             return
+
         self.dismiss((login, password))

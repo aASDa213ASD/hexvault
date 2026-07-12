@@ -146,11 +146,13 @@ def update_account_credentials(account_id: int, login: str, password: str) -> di
         ).scalar_one_or_none()
         if not account:
             raise NotFoundError("Account not found")
+        
         if account.credentials is None:
             account.credentials = Credentials(login=login, password=password)
         else:
             account.credentials.login = login
             account.credentials.password = password
+        
         session.add(account)
         session.commit()
         session.refresh(account)

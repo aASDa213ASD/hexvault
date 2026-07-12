@@ -10,12 +10,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-
 from src.datadragon.client import (
     get_icon_url,
     get_skins_map,
     get_champions_map,
 )
+
 from src.lcu.endpoints import Endpoint
 
 
@@ -24,12 +24,11 @@ APEX_RANK_TIERS = {
     "GRANDMASTER",
     "CHALLENGER"
 }
-
-LEAGUE_CLIENT_PROCESS = "leagueclientux.exe"
 RIOT_CLIENT_PROCESSES = {
     "riot client.exe",
     "riotclientservices.exe",
 }
+LEAGUE_CLIENT_PROCESS = "leagueclientux.exe"
 
 
 @dataclass
@@ -187,8 +186,7 @@ def _request_json(
         with urllib.request.urlopen(req, context=context, timeout=2) as response:
             data = response.read()
             status = response.status
-        if not data:
-            return status, None
+        if not data: return status, None
         return status, json.loads(data.decode("utf-8"))
     except urllib.error.HTTPError as exc:
         try:
@@ -384,16 +382,14 @@ def get_current_account() -> dict | None:
             data = queue_map.get(queue_type, {})
             tier = _parse_rank_tier(data.get("tier"))
             division = _parse_rank_division(tier, data.get("division"))
-            queues.append(
-                {
-                    "type": queue_type,
-                    "tier": tier,
-                    "division": division,
-                    "league_points": data.get("leaguePoints", 0),
-                    "wins": data.get("wins", 0),
-                    "losses": data.get("losses", 0),
-                }
-            )
+            queues.append({
+                "type": queue_type,
+                "tier": tier,
+                "division": division,
+                "league_points": data.get("leaguePoints", 0),
+                "wins": data.get("wins", 0),
+                "losses": data.get("losses", 0),
+            })
 
     collection = _build_collection(config)
     loot = _build_loot(config)
@@ -487,6 +483,7 @@ def _build_loot(config: LCUConfig) -> dict | None:
             "upgrade_essence_value": shard.get("upgradeEssenceValue", 0),
             "is_already_owned": shard.get("itemStatus") == "OWNED",
         }
+        
         if shard_type in ("CHAMPION_RENTAL", "CHAMPION"):
             loot["champion_shards"].append(payload)
         else:

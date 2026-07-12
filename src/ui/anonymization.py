@@ -5,6 +5,7 @@ import random
 
 from faker import Faker
 
+
 _faker = Faker()
 _FAKE_REGIONS = ("EUW", "RU", "EUNE", "NA", "KR")
 _RANK_WEIGHTS = {

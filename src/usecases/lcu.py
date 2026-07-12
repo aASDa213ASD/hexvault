@@ -31,10 +31,6 @@ from src.usecases.errors import (
     ValidationError,
 )
 
-PLACEHOLDER_ACCOUNT_IMAGE_URL = (
-    "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/rewards/honor/milestone/images/honor_background_5.png"
-)
-
 
 def account_summary(account: Account) -> dict:
     summoner = account.summoner
@@ -42,16 +38,15 @@ def account_summary(account: Account) -> dict:
     ranked_queues = []
     if rank:
         for queue in rank.ranked_queues:
-            ranked_queues.append(
-                {
-                    "type": queue.type,
-                    "tier": queue.tier,
-                    "division": queue.division,
-                    "league_points": queue.league_points,
-                    "wins": queue.wins,
-                    "losses": queue.losses,
-                }
-            )
+            ranked_queues.append({
+                "type": queue.type,
+                "tier": queue.tier,
+                "division": queue.division,
+                "league_points": queue.league_points,
+                "wins": queue.wins,
+                "losses": queue.losses,
+            })
+    
     return {
         "id": account.id,
         "summoner": {
@@ -96,23 +91,28 @@ def clear_challenges() -> dict:
     result = clear_challenges_preferences()
     if not result:
         raise ExternalUnavailableError("League Client not available")
+    
     if not result.get("ok"):
         raise ExternalRequestError(
             f"Failed to clear challenges preferences (status {result.get('status')})"
         )
+    
     return {"status": "ok", "lcu_status": result.get("status")}
 
 
 def set_summoner_icon(icon_id: int) -> dict:
     if icon_id < 0:
         raise ValidationError("icon_id must be greater than or equal to 0")
+    
     result = set_current_summoner_icon(icon_id)
     if not result:
         raise ExternalUnavailableError("League Client not available")
+    
     if not result.get("ok"):
         raise ExternalRequestError(
             f"Failed to set summoner icon (status {result.get('status')})"
         )
+    
     return {"status": "ok", "lcu_status": result.get("status")}
 
 
@@ -120,10 +120,12 @@ def dodge_lobby() -> dict:
     result = dodge_champ_select()
     if not result:
         raise ExternalUnavailableError("League Client not available")
+    
     if not result.get("ok"):
         raise ExternalRequestError(
             f"Failed to dodge champ select (status {result.get('status')})"
         )
+    
     return {"status": "ok", "lcu_status": result.get("status")}
 
 
@@ -133,13 +135,16 @@ def current_account_exists() -> dict:
     puuid = summoner.get("puuid")
     if not puuid:
         raise ValidationError("Missing summoner PUUID")
+    
     with get_session() as session:
         existing_summoner = session.execute(
             select(Summoner).where(Summoner.puuid == puuid)
         ).scalar_one_or_none()
         if not existing_summoner or not existing_summoner.account:
             return {"exists": False}
+        
         account = existing_summoner.account
+        
         return {"exists": True, "account": account_summary(account)}
 
 
@@ -178,6 +183,7 @@ def save_current_account(
         )
         if resolved_login is None:
             resolved_login = "Undefined"
+    
         if resolved_password is None:
             resolved_password = "Undefined"
 

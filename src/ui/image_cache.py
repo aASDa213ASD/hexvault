@@ -9,6 +9,7 @@ from PIL import Image as PILImageModule
 
 from src.database.connection import VAR_DIR
 
+
 CACHE_DIR = VAR_DIR / "cache" / "images"
 
 

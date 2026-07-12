@@ -63,6 +63,7 @@ class ConfirmAccountRemovalScreen(ModalScreen[bool]):
         if event.button.id == "remove-confirm":
             self.dismiss(True)
             return
+        
         self.dismiss(False)
 
 
@@ -226,6 +227,7 @@ class AccountDetailScreen(Screen[bool | None]):
                         empty_text="No icon available",
                         id="detail-account-icon",
                     )
+                
                 with Vertical(id="detail-credentials-panel") as panel:
                     panel.border_title = "Credentials"
                     with Horizontal():
@@ -235,10 +237,12 @@ class AccountDetailScreen(Screen[bool | None]):
                         with Vertical():
                             yield Button("IDs", id="copy-ids", compact=False)
                             yield Button("OP.GG", id="open-opgg", compact=False)
+                
                 with Vertical(id="detail-profile-panel") as panel:
                     panel.border_title = "Profile"
                     yield from self._compose_overview_profile()
                     yield from self._compose_overview_ranked()
+                
                 with Vertical(id="detail-collection-panel") as panel:
                     panel.border_title = "Collection"
                     yield from self._compose_overview_currencies()
@@ -255,6 +259,7 @@ class AccountDetailScreen(Screen[bool | None]):
                         classes="detail-search",
                     )
                     yield DataTable(id="detail-champions-table", classes="detail-table")
+                
                 with TabPane("Skins", id="skins"):
                     yield Input(
                         placeholder="Search skins...",
@@ -263,8 +268,10 @@ class AccountDetailScreen(Screen[bool | None]):
                         classes="detail-search",
                     )
                     yield DataTable(id="detail-skins-table", classes="detail-table")
+                
                 with TabPane("Loot", id="loot"):
                     yield DataTable(id="detail-loot-table", classes="detail-table")
+        
         yield Footer()
 
     def on_mount(self) -> None:
@@ -277,7 +284,6 @@ class AccountDetailScreen(Screen[bool | None]):
     def _compose_overview_profile(self) -> ComposeResult:
         summoner = self.account.get("summoner") or {}
         verification = self.account.get("verification") or {}
-        credentials = self.account.get("credentials") or {}
         email_value = verification.get("email") or "-"
         if verification.get("is_email_verified") is not None:
             verified = "verified" if verification.get("is_email_verified") else "unverified"
@@ -309,6 +315,7 @@ class AccountDetailScreen(Screen[bool | None]):
             else:
                 yield self._overview_row("Queues", "No ranked data")
             return
+        
         for index, queue in enumerate(ranked_queues):
             tier = queue.get("tier") or "UNRANKED"
             division = queue.get("division")
@@ -338,6 +345,7 @@ class AccountDetailScreen(Screen[bool | None]):
         if not champions:
             table.add_row("-", "No champions found", "-", "-")
             return
+        
         for champion in champions:
             table.add_row(
                 champion.get("champion_id") or "-",
@@ -354,6 +362,7 @@ class AccountDetailScreen(Screen[bool | None]):
         if not skins:
             table.add_row("-", "No skins found", "-")
             return
+        
         for skin in skins:
             table.add_row(
                 skin.get("skin_id") or "-",
@@ -367,12 +376,12 @@ class AccountDetailScreen(Screen[bool | None]):
         loot = self.account.get("loot") or {}
         champion_shards = loot.get("champion_shards") or []
         skin_shards = loot.get("skin_shards") or []
-        entries = [("Champion", shard) for shard in champion_shards] + [
-            ("Skin", shard) for shard in skin_shards
-        ]
+        
+        entries = [("Champion", shard) for shard in champion_shards] + [("Skin", shard) for shard in skin_shards]
         if not entries:
             table.add_row("No loot", "-", "-", "-")
             return
+        
         for _, shard in entries:
             table.add_row(
                 shard.get("type") or "-",
@@ -388,10 +397,12 @@ class AccountDetailScreen(Screen[bool | None]):
     def _format_summoner_name(self, summoner: dict) -> str:
         if self.hide_names:
             return fake_username_for_summoner(summoner)
+        
         name = summoner.get("name")
         tag = summoner.get("tag")
         if name and tag:
             return f"{name}#{tag}"
+        
         return name or "-"
 
     def _format_region(self, summoner: dict) -> str:
@@ -404,6 +415,7 @@ class AccountDetailScreen(Screen[bool | None]):
         query = self.query_one("#detail-champions-search", Input).value.strip().lower()
         if not query:
             return champions
+        
         return [
             champion
             for champion in champions
@@ -415,6 +427,7 @@ class AccountDetailScreen(Screen[bool | None]):
         query = self.query_one("#detail-skins-search", Input).value.strip().lower()
         if not query:
             return skins
+
         return [
             skin
             for skin in skins
