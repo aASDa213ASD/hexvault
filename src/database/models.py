@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -157,6 +158,12 @@ class RankedQueue(Base):
     )
     losses: Mapped[int] = mapped_column(
         Integer
+    )
+    days_until_decay: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True
+    )
+    decay_deadline: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     rank_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("ranks.id")

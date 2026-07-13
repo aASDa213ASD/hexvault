@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -62,6 +64,8 @@ def account_to_payload(account: Account) -> dict:
                     "league_points": rq.league_points,
                     "wins": rq.wins,
                     "losses": rq.losses,
+                    "days_until_decay": rq.days_until_decay,
+                    "decay_deadline": _format_datetime(rq.decay_deadline),
                 }
                 for rq in account.rank.ranked_queues
             ]
@@ -126,6 +130,16 @@ def list_accounts() -> list[dict]:
     with get_session() as session:
         result = session.execute(_account_query().order_by(Account.id))
         return [account_to_payload(account) for account in result.scalars().all()]
+
+
+def _format_datetime(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc).isoformat()
 
 
 def get_account(account_id: int) -> dict:

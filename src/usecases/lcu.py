@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, time, timedelta, timezone
+
 from sqlalchemy import select
 
 from src.database.connection import get_session
@@ -39,6 +41,8 @@ def account_summary(account: Account) -> dict:
                 "league_points": queue.league_points,
                 "wins": queue.wins,
                 "losses": queue.losses,
+                "days_until_decay": queue.days_until_decay,
+                "decay_deadline": _format_datetime(queue.decay_deadline),
             })
     
     return {
@@ -218,6 +222,8 @@ def save_current_account(
                         league_points=queue.get("league_points", 0),
                         wins=queue.get("wins", 0),
                         losses=queue.get("losses", 0),
+                        days_until_decay=queue.get("days_until_decay"),
+                        decay_deadline=_decay_deadline_for_queue(queue),
                     )
                 )
             account.rank = rank
@@ -281,3 +287,32 @@ def save_current_account(
         session.refresh(account)
 
     return {"status": "saved", "account_id": account.id}
+
+
+def _decay_deadline_for_queue(queue: dict) -> datetime | None:
+    days_until_decay = queue.get("days_until_decay")
+    if days_until_decay is None:
+        return None
+
+    try:
+        days = int(days_until_decay)
+    except (TypeError, ValueError):
+        return None
+
+    now = datetime.now().astimezone()
+    local_midnight = datetime.combine(
+        now.date() + timedelta(days=max(days, 0)),
+        time.min,
+        tzinfo=now.tzinfo,
+    )
+    return local_midnight.astimezone(timezone.utc)
+
+
+def _format_datetime(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc).isoformat()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 
 from rich.text import Text
@@ -112,6 +113,7 @@ class Hexvault(App):
         self._posting_workspace = prepare_lcu_posting_workspace()
         self._active_sync_worker: Worker[SyncResult] | None = None
         self._active_health_worker: Worker[dict] | None = None
+        self._decay_deadlines: dict[str, datetime] = {}
         self._sync_progress_screen: SyncProgressScreen | None = None
         super().__init__()
 
@@ -132,12 +134,20 @@ class Hexvault(App):
         self._accounts: list[dict] = []
         self._populate_accounts_table()
         self._populate_lcu_status()
+        self.set_interval(60, self._update_decay_countdowns, name="decay-countdown")
 
     def _populate_accounts_table(self) -> None:
         table = self.query_one("#accounts-table", DataTable)
         table.clear(columns=True)
         table.cursor_type = "row"
-        table.add_columns("ID", "Summoner", "Region", "Level", "Rank", "Blue Essence")
+        table.add_column("ID")
+        table.add_column("Summoner")
+        table.add_column("Region")
+        table.add_column("Level")
+        table.add_column("Blue Essence")
+        table.add_column("Rank")
+        table.add_column("Decay", key="decay")
+        self._decay_deadlines = {}
 
         self._accounts = list_accounts()
         if not self._accounts:
@@ -148,7 +158,7 @@ class Hexvault(App):
             self.query_one("#riot-points", Static).update("-")
             self.query_one("#champions-count", Static).update("-")
             self.query_one("#skins-count", Static).update("-")
-            table.add_row("-", "No accounts found", "-", "-", "-", "-")
+            table.add_row("-", "No accounts found", "-", "-", "-", "-", "-")
             return
 
         icon_urls: list[str] = []
@@ -178,17 +188,86 @@ class Hexvault(App):
                 division = primary_queue.get("division")
                 if division:
                     rank_label = f"{rank_label} {division}"
+            days_until_decay = primary_queue.get("days_until_decay")
+            row_key = f"account-{account.get('id')}"
+            decay_deadline = self._decay_deadline(primary_queue)
+            if decay_deadline is not None:
+                self._decay_deadlines[row_key] = decay_deadline
 
             table.add_row(
                 Text(str(account.get("id", "")), style="dim"),
                 Text(self._format_summoner_name(summoner), style="$primary"),
                 Text(self._format_region(summoner), style="dim"),
                 Text(str(summoner.get("level") or "-"), style="dim"),
-                Text(rank_label, style=RANK_COLORS.get(rank_tier, "")),
                 Text(str(loot.get("blue_essence") or "-"), style="#B2DCFF"),
+                Text(rank_label, style=RANK_COLORS.get(rank_tier, "")),
+                Text(
+                    self._format_decay_countdown(decay_deadline),
+                    style="#FFF4D0" if decay_deadline is not None else "dim",
+                ),
+                key=row_key,
             )
 
         self._show_account_details(self._accounts[0])
+
+    def _decay_deadline(self, queue: dict) -> datetime | None:
+        stored_deadline = queue.get("decay_deadline")
+        if isinstance(stored_deadline, str):
+            try:
+                parsed = datetime.fromisoformat(
+                    stored_deadline.replace("Z", "+00:00")
+                )
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                return parsed.astimezone(timezone.utc)
+            except ValueError:
+                pass
+
+        days_until_decay = queue.get("days_until_decay")
+        if days_until_decay is None:
+            return None
+
+        try:
+            days = int(days_until_decay)
+        except (TypeError, ValueError):
+            return None
+
+        now = datetime.now().astimezone()
+        local_midnight = datetime.combine(
+            now.date() + timedelta(days=max(days, 0)),
+            time.min,
+            tzinfo=now.tzinfo,
+        )
+        return local_midnight.astimezone(timezone.utc)
+
+    def _format_decay_countdown(self, deadline: datetime | None) -> str:
+        if deadline is None:
+            return ""
+
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+
+        remaining = max(
+            0,
+            int((deadline - datetime.now(timezone.utc)).total_seconds()),
+        )
+        days, remainder = divmod(remaining, 86_400)
+        hours, remainder = divmod(remainder, 3_600)
+        minutes = remainder // 60
+        seconds = remainder // 60
+        return f"in {days}d {hours:02}h {minutes:02}m"
+
+    def _update_decay_countdowns(self) -> None:
+        if not self._decay_deadlines:
+            return
+
+        table = self.query_one("#accounts-table", DataTable)
+        for row_key, deadline in self._decay_deadlines.items():
+            table.update_cell(
+                row_key,
+                "decay",
+                Text(self._format_decay_countdown(deadline), style="$warning"),
+            )
 
     def _format_summoner_name(self, summoner: dict) -> str:
         if self._is_hide_names_enabled():

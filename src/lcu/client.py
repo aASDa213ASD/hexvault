@@ -401,6 +401,7 @@ def get_current_account() -> dict | None:
             data = queue_map.get(queue_type, {})
             tier = _parse_rank_tier(data.get("tier"))
             division = _parse_rank_division(tier, data.get("division"))
+            warnings = data.get("warnings") or {}
             queues.append({
                 "type": queue_type,
                 "tier": tier,
@@ -408,6 +409,7 @@ def get_current_account() -> dict | None:
                 "league_points": data.get("leaguePoints", 0),
                 "wins": data.get("wins", 0),
                 "losses": data.get("losses", 0),
+                "days_until_decay": warnings.get("daysUntilDecay"),
             })
 
     collection = _build_collection(config)
