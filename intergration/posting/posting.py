@@ -283,6 +283,7 @@ def _read_lcu_process_config() -> dict | None:
 
     if league_client or riot_client:
         return {"league_client": league_client, "riot_client": riot_client}
+    
     return None
 
 

@@ -117,6 +117,7 @@ def _config_from_values(
     password = values.get(password_key)
     if not port or not password:
         return None
+    
     return LCUConfig(
         base_url=f"https://127.0.0.1:{port}",
         password=password,
@@ -186,7 +187,8 @@ def _request_json(
         with urllib.request.urlopen(req, context=context, timeout=2) as response:
             data = response.read()
             status = response.status
-        if not data: return status, None
+        if not data:
+            return status, None
         return status, json.loads(data.decode("utf-8"))
     except urllib.error.HTTPError as exc:
         try:
@@ -221,11 +223,13 @@ def _parse_rank_division(tier: str, value: str | None) -> str | None:
 
 
 def _format_lcu_timestamp(value: int | float | str | None) -> str | None:
-    if value in (None, ""): return None
+    if value in (None, ""):
+        return None
     
     if isinstance(value, str):
         normalized = value.strip()
-        if not normalized: return None
+        if not normalized:
+            return None
         
         for date_format in ("%Y%m%dT%H%M%S.%fZ", "%Y%m%dT%H%M%SZ"):
             try:
@@ -253,7 +257,8 @@ def _format_lcu_timestamp(value: int | float | str | None) -> str | None:
 
 def clear_challenges_preferences() -> dict | None:
     config = _read_lcu_process()
-    if not config: return None
+    if not config:
+        return None
 
     status, payload = _request_json(
         config,
@@ -261,7 +266,8 @@ def clear_challenges_preferences() -> dict | None:
         Endpoint.CHALLENGES_PLAYER_PREFERENCES,
         {"challengeIds": []},
     )
-    if status is None: return None
+    if status is None:
+        return None
     
     return {
         "status": status,
@@ -272,7 +278,8 @@ def clear_challenges_preferences() -> dict | None:
 
 def set_current_summoner_icon(profile_icon_id: int) -> dict | None:
     config = _read_lcu_process()
-    if not config: return None
+    if not config:
+        return None
 
     status, payload = _request_json(
         config,
@@ -280,7 +287,8 @@ def set_current_summoner_icon(profile_icon_id: int) -> dict | None:
         Endpoint.CURRENT_SUMMONER_ICON,
         {"profileIconId": profile_icon_id},
     )
-    if status is None: return None
+    if status is None:
+        return None
 
     return {
         "status": status,
@@ -291,10 +299,12 @@ def set_current_summoner_icon(profile_icon_id: int) -> dict | None:
 
 def get_matchmaking_search_state() -> str | None:
     config = _read_lcu_process()
-    if not config: return None
+    if not config:
+        return None
     
     payload = _request(config, Endpoint.MATCHMAKING_SEARCH_STATE)
-    if not isinstance(payload, dict): return None
+    if not isinstance(payload, dict):
+        return None
     
     value = payload.get("searchState")
     return value if isinstance(value, str) else None
@@ -310,14 +320,16 @@ def is_match_searching() -> bool:
 
 def accept_ready_check() -> dict | None:
     config = _read_lcu_process()
-    if not config: return None
+    if not config:
+        return None
 
     status, payload = _request_json(
         config,
         "POST",
         Endpoint.READY_CHECK_ACCEPT,
     )
-    if status is None: return None
+    if status is None:
+        return None
 
     return {
         "status": status,
@@ -328,7 +340,8 @@ def accept_ready_check() -> dict | None:
 
 def dodge_champ_select() -> dict | None:
     config = _read_lcu_process()
-    if not config: return None
+    if not config:
+        return None
 
     status, payload = _request_json(
         config,
@@ -336,7 +349,8 @@ def dodge_champ_select() -> dict | None:
         Endpoint.DODGE_CHAMP_SELECT,
         {},
     )
-    if status is None: return None
+    if status is None:
+        return None
 
     return {
         "status": status,
@@ -347,12 +361,14 @@ def dodge_champ_select() -> dict | None:
 
 def get_current_account() -> dict | None:
     config = _read_lcu_process()
-    if not config: return None
+    if not config:
+        return None
 
     current = _request(config, Endpoint.CURRENT_SUMMONER)
     riot_config = get_riot_client_config()
     region_data = _request(riot_config or config, Endpoint.CURRENT_REGION)
-    if not current or not region_data: return None
+    if not current or not region_data:
+        return None
 
     summoner = {
         "summoner_account_id": current.get("accountId"),
@@ -404,10 +420,12 @@ def get_current_account() -> dict | None:
 
 def get_current_summoner() -> dict | None:
     config = _read_lcu_process()
-    if not config: return None
+    if not config:
+        return None
 
     current = _request(config, Endpoint.CURRENT_SUMMONER)
-    if not current: return None
+    if not current:
+        return None
 
     summoner = {
         "name": current.get("gameName"),
@@ -425,7 +443,8 @@ def _build_collection(config: LCUConfig) -> dict:
     champions_map = get_champions_map()
     for champion in champions_owned:
         ownership = champion.get("ownership") or {}
-        if not ownership.get("owned"): continue
+        if not ownership.get("owned"):
+            continue
         champion_id = champion.get("id")
         meta = champions_map.get(champion_id) or champion
 
@@ -442,10 +461,12 @@ def _build_collection(config: LCUConfig) -> dict:
     for skin in owned_skins:
         item_id = skin.get("itemId")
         meta = skins_map.get(str(item_id))
-        if not meta: continue
+        if not meta:
+            continue
 
         name = meta.get("name")
-        if not name: continue
+        if not name:
+            continue
 
         skins.append({
             "skin_id": item_id,
@@ -459,7 +480,8 @@ def _build_collection(config: LCUConfig) -> dict:
 
 def _build_loot(config: LCUConfig) -> dict | None:
     wallet = _request(config, Endpoint.CURRENT_WALLET) or {}
-    if not wallet: return None
+    if not wallet:
+        return None
 
     loot = {
         "blue_essence": wallet.get("lol_blue_essence", 0),

@@ -194,29 +194,7 @@ class AccountDetailScreen(Screen[bool | None]):
 
     def compose(self) -> ComposeResult:
         summoner = self.account.get("summoner") or {}
-        collection = self.account.get("collection") or {}
-        loot = self.account.get("loot") or {}
-        ranked_queues = self._ranked_queues()
-        if self.randomize_ranks:
-            queue_key = str(
-                (ranked_queues[0] if ranked_queues else {}).get("type") or "primary"
-            )
-            fake_rank, fake_tier = fake_rank_for_account(self.account, queue_key)
-            if ranked_queues:
-                queue_type = ranked_queues[0].get("type") or "Rank"
-                primary_rank = f"{queue_type}  {fake_rank} {fake_tier}"
-            else:
-                primary_rank = f"{fake_rank} {fake_tier}"
-        elif ranked_queues:
-            queue = ranked_queues[0]
-            tier = queue.get("tier") or "UNRANKED"
-            division = queue.get("division")
-            queue_type = queue.get("type") or "Rank"
-            label = f"{tier} {division}" if division else tier
-            primary_rank = f"{queue_type}  {label}"
-        else:
-            primary_rank = "UNRANKED"
-
+        
         with VerticalScroll(id="detail-root"):
             with Horizontal(id="detail-hero"):
                 with Vertical(id="detail-icon-panel") as panel:
@@ -497,5 +475,5 @@ class AccountDetailScreen(Screen[bool | None]):
         try:
             delete_account(account_id)
             self.dismiss(True)
-        except Exception as exc:
+        except Exception:
             pass

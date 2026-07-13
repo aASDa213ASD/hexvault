@@ -19,7 +19,8 @@ class AutoAcceptService:
 
     def start(self) -> bool:
         with self._lock:
-            if self._running: return False
+            if self._running:
+                return False
 
             self._stop_event = threading.Event()
             self._thread = threading.Thread(target=self._run, daemon=True)
@@ -32,7 +33,9 @@ class AutoAcceptService:
     def stop(self) -> bool:
         thread_to_join: threading.Thread | None = None
         with self._lock:
-            if not self._running: return False
+            if not self._running:
+                return False
+            
             self._stop_event.set()
             thread_to_join = self._thread
 

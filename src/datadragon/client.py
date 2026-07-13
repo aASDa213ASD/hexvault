@@ -10,13 +10,17 @@ from src.datadragon.endpoints import Endpoint
 
 
 def get_image_url(lol_game_data_path: str | None) -> str | None:
-    if not lol_game_data_path: return None
+    if not lol_game_data_path:
+        return None
+    
     path = lol_game_data_path.lower().replace("/lol-game-data/assets/", "")
     return f"https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/{path}"
 
 
 def get_icon_url(icon_id: int | None) -> str | None:
-    if icon_id is None: return None
+    if icon_id is None:
+        return None
+    
     return (
         "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/"
         f"global/default/v1/profile-icons/{icon_id}.jpg"
@@ -51,7 +55,8 @@ def _fetch_json(url: str) -> Any:
 def get_skins_map() -> dict:
     try:
         data = _fetch_json(Endpoint.SKINS)
-        if isinstance(data, dict): return data
+        if isinstance(data, dict):
+            return data
     except Exception:
         return {}
     return {}

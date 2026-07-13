@@ -33,7 +33,6 @@ from src.usecases.accounts import list_accounts
 from src.usecases.health import health
 from src.usecases.lcu import (
     current_account_exists,
-    get_auto_accept_status,
     get_current_account_from_lcu,
     save_current_account,
 )
@@ -383,7 +382,8 @@ class Hexvault(App):
             "setting-hide-names",
             "setting-hide-regions",
             "setting-randomize-ranks",
-        }: return
+        }:
+            return
 
         selected_row = self.query_one("#accounts-table", DataTable).cursor_row
         self._populate_accounts_table()
@@ -419,7 +419,7 @@ class Hexvault(App):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "open-posting-here":
             with self.suspend():
-                status = run_lcu_posting_foreground()
+                run_lcu_posting_foreground()
             return
 
         if event.button.id != "lcu-sync":

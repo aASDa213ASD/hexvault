@@ -1,1 +1,1 @@
-"""UI package for reusable Textual components."""
+# Package marker

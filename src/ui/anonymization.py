@@ -25,9 +25,7 @@ _TIER_I_ONLY_RANKS = {"MASTER", "GRANDMASTER", "CHALLENGER"}
 
 
 def _seed_for_summoner(summoner: dict) -> int:
-    name = (summoner.get("name") or "").strip()
-    tag = (summoner.get("tag") or "").strip()
-    seed_source = f"{name}#{tag}"
+    seed_source = summoner.get('puuid')
     return int(hashlib.sha256(seed_source.encode("utf-8")).hexdigest(), 16) % (2**32)
 
 
@@ -39,7 +37,7 @@ def fake_username_for_summoner(summoner: dict) -> str:
 
     # Seed Faker per summoner identity so aliases stay stable across screens.
     _faker.seed_instance(_seed_for_summoner(summoner))
-    fake_name = _faker.user_name()
+    fake_name = _faker.name_nonbinary().replace(' ', '')
     fake_tag = _faker.lexify(text="?????", letters="123456790").upper()
     return f"{fake_name}#{fake_tag}"
 
