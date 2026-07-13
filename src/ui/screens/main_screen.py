@@ -109,6 +109,7 @@ class Hexvault(App):
     def __init__(self) -> None:
         self._posting_workspace = prepare_lcu_posting_workspace()
         self._active_sync_worker: Worker[SyncResult] | None = None
+        self._active_health_worker: Worker[dict] | None = None
         self._sync_progress_screen: SyncProgressScreen | None = None
         super().__init__()
 
@@ -262,10 +263,39 @@ class Hexvault(App):
                                 )
                 
                 with TabPane("Health", id="health"):
-                    with Vertical(classes="section single-panel") as panel:
+                    with VerticalScroll(id="health-tab", classes="section single-panel") as panel:
                         panel.border_title = "Health"
                         panel.border_subtitle = "Dependencies"
-                        yield Static(id="health-status", classes="status-copy")
+                        with Horizontal(id="health-overview"):
+                            with Vertical(id="health-state-panel", classes="health-metric"):
+                                yield Static("System status", classes="health-metric-label")
+                                yield Static("Checking", id="health-overall-state", classes="health-metric-value")
+                            with Vertical(classes="health-metric"):
+                                yield Static("Healthy", classes="health-metric-label")
+                                yield Static("-", id="health-healthy-count", classes="health-metric-value")
+                            with Vertical(classes="health-metric"):
+                                yield Static("Failing", classes="health-metric-label")
+                                yield Static("-", id="health-failing-count", classes="health-metric-value")
+
+                        with Vertical(id="health-checks"):
+                            with Horizontal(id="health-check-db", classes="health-check") as row:
+                                row.border_title = "Database"
+                                with Vertical(classes="health-check-copy"):
+                                    yield Static("SQLite Storage", classes="health-check-title")
+                                    yield Static("-", id="health-detail-db", classes="health-check-detail")
+                                yield Static("-", id="health-state-db", classes="health-check-state")
+                            with Horizontal(id="health-check-lcu", classes="health-check") as row:
+                                row.border_title = "League Client"
+                                with Vertical(classes="health-check-copy"):
+                                    yield Static("LCU Session", classes="health-check-title")
+                                    yield Static("-", id="health-detail-lcu", classes="health-check-detail")
+                                yield Static("-", id="health-state-lcu", classes="health-check-state")
+                            with Horizontal(id="health-check-community-dragon", classes="health-check") as row:
+                                row.border_title = "Community Dragon"
+                                with Vertical(classes="health-check-copy"):
+                                    yield Static("Game assets and data", classes="health-check-title")
+                                    yield Static("-", id="health-detail-community-dragon", classes="health-check-detail")
+                                yield Static("-", id="health-state-community-dragon", classes="health-check-state")
         
         yield Footer()
 
@@ -276,7 +306,6 @@ class Hexvault(App):
         self._accounts: list[dict] = []
         self._populate_accounts_table()
         self._populate_lcu_status()
-        self._populate_health_status()
 
     def _populate_accounts_table(self) -> None:
         table = self.query_one("#accounts-table", DataTable)
@@ -447,6 +476,13 @@ class Hexvault(App):
         if 0 <= selected_row < len(self._accounts):
             self._show_account_details(self._accounts[selected_row])
 
+    def on_tabbed_content_tab_activated(
+        self,
+        event: TabbedContent.TabActivated,
+    ) -> None:
+        if event.pane.id == "health":
+            self._start_health_check()
+
     def _populate_lcu_status(self) -> None:
         # status = get_auto_accept_status()
         summoner = get_current_summoner()
@@ -537,6 +573,10 @@ class Hexvault(App):
             )
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if event.worker is self._active_health_worker:
+            self._handle_health_worker_state(event)
+            return
+
         if event.worker is not self._active_sync_worker:
             return
 
@@ -580,7 +620,7 @@ class Hexvault(App):
             name = self._format_summoner_name(summoner)
             action = "Account synced" if result.kind == "synced" else "Account added"
             self._populate_accounts_table()
-            self._populate_health_status()
+            self._start_health_check()
             self._update_lcu_identity(result.summoner)
             self._set_lcu_sync_status(f"{action} - {name}")
             return
@@ -640,14 +680,116 @@ class Hexvault(App):
         except Exception:
             return None
 
-    def _populate_health_status(self) -> None:
-        status = health()
-        lines = []
-        for name, result in status.items():
-            ok = result.get("ok")
-            error = result.get("error")
-            line = f"{name}: {'Operational' if ok else 'Fatal'}"
-            if error:
-                line = f"{line} ({error})"
-            lines.append(line)
-        self.query_one("#health-status", Static).update("\n".join(lines))
+    def _start_health_check(self) -> None:
+        if self._active_health_worker and not self._active_health_worker.is_finished:
+            return
+
+        self._set_health_check_pending()
+        self._active_health_worker = self._health_check_worker()
+
+    @work(thread=True, exclusive=True, group="health", exit_on_error=False)
+    def _health_check_worker(self) -> dict:
+        return health()
+
+    def _handle_health_worker_state(self, event: Worker.StateChanged) -> None:
+        if event.state not in {
+            WorkerState.CANCELLED,
+            WorkerState.ERROR,
+            WorkerState.SUCCESS,
+        }:
+            return
+
+        self._active_health_worker = None
+
+        if event.state != WorkerState.SUCCESS or event.worker.result is None:
+            self._populate_health_status(
+                {
+                    "COMMUNITY_DRAGON": {
+                        "ok": False,
+                        "error": "Health check did not complete",
+                    },
+                    "LCU": {
+                        "ok": False,
+                        "error": "Health check did not complete",
+                    },
+                    "DB": {
+                        "ok": False,
+                        "error": "Health check did not complete",
+                    },
+                }
+            )
+            return
+
+        self._populate_health_status(event.worker.result)
+
+    def _set_health_check_pending(self) -> None:
+        self.query_one("#health-overall-state", Static).update("Checking")
+        self.query_one("#health-healthy-count", Static).update("-")
+        self.query_one("#health-failing-count", Static).update("-")
+        self._set_health_row_pending("community-dragon")
+        self._set_health_row_pending("lcu")
+        self._set_health_row_pending("db")
+
+    def _set_health_row_pending(self, row_id: str) -> None:
+        row = self.query_one(f"#health-check-{row_id}", Horizontal)
+        state = self.query_one(f"#health-state-{row_id}", Static)
+        detail_widget = self.query_one(f"#health-detail-{row_id}", Static)
+
+        row.remove_class("ok")
+        row.remove_class("fatal")
+        state.remove_class("ok")
+        state.remove_class("fatal")
+        state.update("...")
+        detail_widget.update("Checking...")
+
+    def _populate_health_status(self, status: dict) -> None:
+        healthy_count = sum(1 for result in status.values() if result.get("ok"))
+        failing_count = len(status) - healthy_count
+
+        overall_label = "Operational" if failing_count == 0 else "Degraded"
+        self.query_one("#health-overall-state", Static).update(overall_label)
+        self.query_one("#health-healthy-count", Static).update(str(healthy_count))
+        self.query_one("#health-failing-count", Static).update(str(failing_count))
+
+        self._set_health_row(
+            "community-dragon",
+            status.get("COMMUNITY_DRAGON") or {},
+            ok_detail="Reachable",
+        )
+        self._set_health_row(
+            "lcu",
+            status.get("LCU") or {},
+            ok_detail="Client session detected",
+            fail_detail="Client is closed or not authenticated",
+        )
+        self._set_health_row(
+            "db",
+            status.get("DB") or {},
+            ok_detail="Connection ready",
+        )
+
+    def _set_health_row(
+        self,
+        row_id: str,
+        result: dict,
+        *,
+        ok_detail: str,
+        fail_detail: str = "Unavailable",
+    ) -> None:
+        ok = bool(result.get("ok"))
+        label = "OK" if ok else "Fatal"
+        detail = ok_detail if ok else str(result.get("error") or fail_detail)
+        status_code = result.get("status")
+        if ok and status_code:
+            detail = f"{detail} - HTTP {status_code}"
+
+        row = self.query_one(f"#health-check-{row_id}", Horizontal)
+        state = self.query_one(f"#health-state-{row_id}", Static)
+        detail_widget = self.query_one(f"#health-detail-{row_id}", Static)
+
+        row.set_class(ok, "ok")
+        row.set_class(not ok, "fatal")
+        state.set_class(ok, "ok")
+        state.set_class(not ok, "fatal")
+        state.update(label)
+        detail_widget.update(detail)

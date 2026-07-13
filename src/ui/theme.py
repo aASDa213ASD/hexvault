@@ -299,4 +299,97 @@ Hexvault {
     margin-top: 1;
     margin-left: 1;
 }
+
+#health-tab {
+    padding: 1 2;
+}
+
+#health-overview {
+    width: 1fr;
+    height: auto;
+}
+
+.health-metric {
+    width: 1fr;
+    height: 6;
+    margin-right: 1;
+    padding: 0 1;
+    border: round $surface-lighten-1;
+    border-title-align: right;
+    align-horizontal: center;
+    align-vertical: middle;
+}
+
+.health-metric-value {
+    width: 1fr;
+    height: 1;
+    color: $primary;
+    text-style: bold;
+    text-align: center;
+}
+
+.health-metric-label {
+    width: 1fr;
+    height: 1;
+    color: $text-muted;
+    text-align: center;
+}
+
+#health-checks {
+    width: 1fr;
+    height: auto;
+    padding-top: 1;
+}
+
+.health-check {
+    width: 1fr;
+    height: 5;
+    margin-bottom: 1;
+    padding: 0 1;
+    border: round $surface-lighten-1;
+    border-title-align: right;
+    border-title-color: $text-muted;
+}
+
+.health-check.ok {
+    border: round $success 60%;
+}
+
+.health-check.fatal {
+    border: round $error 70%;
+}
+
+.health-check-copy {
+    width: 1fr;
+    height: auto;
+    border-title-align: right;
+    border-title-color: $text-muted;
+}
+
+.health-check-title {
+    color: $foreground;
+    text-style: bold;
+}
+
+.health-check-detail {
+    color: $text-muted;
+    text-wrap: wrap;
+}
+
+.health-check-state {
+    width: 10;
+    height: 1;
+    margin-top: 1;
+    margin-left: 1;
+    text-align: right;
+    text-style: bold;
+}
+
+.health-check-state.ok {
+    color: $success;
+}
+
+.health-check-state.fatal {
+    color: $error;
+}
 """
