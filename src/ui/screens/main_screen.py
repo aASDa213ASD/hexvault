@@ -1,11 +1,24 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from rich.text import Text
+from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Button, Checkbox, DataTable, Footer, Static, TabbedContent, TabPane
+from textual.screen import ModalScreen
+from textual.worker import Worker, WorkerState
+from textual.widgets import (
+    Button,
+    Checkbox,
+    DataTable,
+    Footer,
+    ProgressBar,
+    Static,
+    TabbedContent,
+    TabPane,
+)
 
 from src.database.connection import init_db
 from src.lcu.client import get_current_summoner
@@ -41,12 +54,62 @@ from src.usecases.lcu import (
 RANKS_DIR = Path(__file__).resolve().parents[3] / "resources" / "ranks"
 
 
+@dataclass
+class SyncResult:
+    kind: str
+    current: dict | None = None
+    summoner: dict | None = None
+    error: str | None = None
+
+
+class SyncProgressScreen(ModalScreen[None]):
+    CSS = """
+    SyncProgressScreen {
+        align: center middle;
+    }
+
+    #sync-progress-dialog {
+        width: 52;
+        max-height: 8;
+        padding: 1 2;
+        border: round $surface;
+    }
+
+    #sync-progress-title {
+        text-style: bold;
+    }
+
+    #sync-progress-indicator {
+        height: 1;
+        margin-left: 6;
+        margin-top: 1;
+    }
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__()
+        self.message = message
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="sync-progress-dialog"):
+            yield Static("This might take a moment", id="sync-progress-title")
+            yield Static(self.message, id="sync-progress-body")
+            yield ProgressBar(
+                total=None,
+                show_percentage=False,
+                show_eta=False,
+                id="sync-progress-indicator",
+            )
+
+
 class Hexvault(App):
     BINDINGS = [("q", "quit", "Quit")]
     CSS = HEXVAULT_CSS
 
     def __init__(self) -> None:
         self._posting_workspace = prepare_lcu_posting_workspace()
+        self._active_sync_worker: Worker[SyncResult] | None = None
+        self._sync_progress_screen: SyncProgressScreen | None = None
         super().__init__()
 
     def compose(self) -> ComposeResult:
@@ -419,40 +482,111 @@ class Hexvault(App):
         if event.button.id != "lcu-sync":
             return
         
-        self._sync_current_account()
+        self._start_sync_current_account()
 
-    def _sync_current_account(self) -> None:
+    def _start_sync_current_account(self) -> None:
+        if self._active_sync_worker and not self._active_sync_worker.is_finished:
+            return
+
+        self._show_sync_progress("Requesting data from the League Client...")
+        self._set_sync_button_enabled(False)
+        self._set_lcu_sync_status("Syncing...")
+        self._active_sync_worker = self._sync_current_account()
+
+    @work(thread=True, exclusive=True, group="lcu-sync", exit_on_error=False)
+    def _sync_current_account(self) -> SyncResult:
         try:
             current = get_current_account_from_lcu()
             exists = current_account_exists().get("exists", False)
             if not exists:
-                self.push_screen(
-                    AccountCredentialsScreen(),
-                    callback=lambda credentials: self._save_new_account_with_credentials(
-                        current, credentials
-                    ),
-                )
-                return
+                return SyncResult(kind="credentials_required", current=current)
 
             save_current_account(overwrite=True)
+            return SyncResult(
+                kind="synced",
+                current=current,
+                summoner=get_current_summoner(),
+            )
+        except Exception as exc:
+            return SyncResult(
+                kind="error",
+                error=f"fatal: {exc}",
+                summoner=self._get_current_summoner_safely(),
+            )
+
+    @work(thread=True, exclusive=True, group="lcu-sync", exit_on_error=False)
+    def _save_new_account_with_credentials_worker(
+        self,
+        current: dict,
+        credentials: tuple[str, str],
+    ) -> SyncResult:
+        login, password = credentials
+        try:
+            save_current_account(login=login, password=password, overwrite=False)
+            return SyncResult(
+                kind="added",
+                current=current,
+                summoner=get_current_summoner(),
+            )
+        except Exception as exc:
+            return SyncResult(
+                kind="error",
+                current=current,
+                error=f"fatal: {exc}",
+                summoner=self._get_current_summoner_safely(),
+            )
+
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if event.worker is not self._active_sync_worker:
+            return
+
+        if event.state not in {
+            WorkerState.CANCELLED,
+            WorkerState.ERROR,
+            WorkerState.SUCCESS,
+        }:
+            return
+
+        self._dismiss_sync_progress()
+        self._set_sync_button_enabled(True)
+        self._active_sync_worker = None
+
+        result = event.worker.result
+        if result is None:
+            self._set_lcu_sync_status("fatal: Sync worker did not return a result")
+            return
+
+        self._handle_sync_result(result)
+
+    def _handle_sync_result(self, result: SyncResult) -> None:
+        if result.kind == "credentials_required":
+            if result.current is None:
+                self._set_lcu_sync_status("fatal: League Client account data missing")
+                return
+
+            current = result.current
+            self.push_screen(
+                AccountCredentialsScreen(),
+                callback=lambda credentials: self._save_new_account_with_credentials(
+                    current,
+                    credentials,
+                ),
+            )
+            return
+
+        if result.kind in {"synced", "added"}:
+            current = result.current or {}
             summoner = current.get("summoner") or {}
             name = self._format_summoner_name(summoner)
-            sync_status = f"Account synced - {name}"
+            action = "Account synced" if result.kind == "synced" else "Account added"
             self._populate_accounts_table()
             self._populate_health_status()
-            summoner = get_current_summoner()
-            self.query_one("#client-icon", RemoteImage).load_from_url(
-                summoner.get("icon_url") if summoner else None
-            )
-            self._set_lcu_welcome(summoner)
-            self._set_lcu_sync_status(sync_status)
-        except Exception as exc:
-            summoner = get_current_summoner()
-            self.query_one("#client-icon", RemoteImage).load_from_url(
-                summoner.get("icon_url") if summoner else None
-            )
-            self._set_lcu_welcome(summoner)
-            self._set_lcu_sync_status(f"fatal: {exc}")
+            self._update_lcu_identity(result.summoner)
+            self._set_lcu_sync_status(f"{action} - {name}")
+            return
+
+        self._update_lcu_identity(result.summoner)
+        self._set_lcu_sync_status(result.error or "fatal: Sync failed")
 
     def _save_new_account_with_credentials(
         self,
@@ -468,24 +602,43 @@ class Hexvault(App):
             self._set_lcu_sync_status("Sync has been cancelled")
             return
 
-        login, password = credentials
+        self._show_sync_progress("Saving new account...")
+        self._set_sync_button_enabled(False)
+        self._set_lcu_sync_status("Saving account...")
+        self._active_sync_worker = self._save_new_account_with_credentials_worker(
+            current,
+            credentials,
+        )
+
+    def _show_sync_progress(self, message: str) -> None:
+        self._dismiss_sync_progress()
+        self._sync_progress_screen = SyncProgressScreen(message)
+        self.push_screen(self._sync_progress_screen)
+
+    def _dismiss_sync_progress(self) -> None:
+        if self._sync_progress_screen is None:
+            return
+
         try:
-            save_current_account(login=login, password=password, overwrite=False)
-            name = self._format_summoner_name(summoner)
-            sync_status = f"Account added {name}"
-            self._populate_accounts_table()
-            self._populate_health_status()
-            self.query_one("#client-icon", RemoteImage).load_from_url(
-                summoner.get("icon_url")
-            )
-            self._set_lcu_welcome(summoner)
-            self._set_lcu_sync_status(sync_status)
-        except Exception as exc:
-            self.query_one("#client-icon", RemoteImage).load_from_url(
-                summoner.get("icon_url")
-            )
-            self._set_lcu_welcome(summoner)
-            self._set_lcu_sync_status(f"fatal: {exc}")
+            self._sync_progress_screen.dismiss(None)
+        except Exception:
+            pass
+        self._sync_progress_screen = None
+
+    def _set_sync_button_enabled(self, enabled: bool) -> None:
+        self.query_one("#lcu-sync", Button).disabled = not enabled
+
+    def _update_lcu_identity(self, summoner: dict | None) -> None:
+        self.query_one("#client-icon", RemoteImage).load_from_url(
+            summoner.get("icon_url") if summoner else None
+        )
+        self._set_lcu_welcome(summoner)
+
+    def _get_current_summoner_safely(self) -> dict | None:
+        try:
+            return get_current_summoner()
+        except Exception:
+            return None
 
     def _populate_health_status(self) -> None:
         status = health()
