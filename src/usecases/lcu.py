@@ -170,10 +170,13 @@ def save_current_account(
             raise RuntimeError(f"Account already exists: {summary}")
 
         if existing_account:
+            existing_notes = existing_account.notes
             session.delete(existing_account)
             session.flush()
+        else:
+            existing_notes = ""
 
-        account = Account()
+        account = Account(notes=existing_notes)
 
         resolved_login = existing_credentials.login if existing_credentials else login
         resolved_password = (

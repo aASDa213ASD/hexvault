@@ -147,6 +147,7 @@ class Hexvault(App):
         table.add_column("Blue Essence")
         table.add_column("Rank")
         table.add_column("Decay", key="decay")
+        table.add_column("Notes")
         self._decay_deadlines = {}
 
         self._accounts = list_accounts()
@@ -158,7 +159,7 @@ class Hexvault(App):
             self.query_one("#riot-points", Static).update("-")
             self.query_one("#champions-count", Static).update("-")
             self.query_one("#skins-count", Static).update("-")
-            table.add_row("-", "No accounts found", "-", "-", "-", "-", "-")
+            table.add_row("-", "No accounts found", "-", "-", "-", "-", "-", "-")
             return
 
         icon_urls: list[str] = []
@@ -204,6 +205,10 @@ class Hexvault(App):
                 Text(
                     self._format_decay_countdown(decay_deadline),
                     style="#FFF4D0" if decay_deadline is not None else "dim",
+                ),
+                Text(
+                    " ".join(str(account.get("notes") or "").splitlines()) or '',
+                    style="dim",
                 ),
                 key=row_key,
             )

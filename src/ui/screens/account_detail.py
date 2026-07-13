@@ -12,6 +12,7 @@ from textual.widgets import (
     Footer,
     Input,
     Static,
+    TextArea,
     TabbedContent,
     TabPane,
 )
@@ -23,7 +24,7 @@ from src.ui.shared.privacy import (
 )
 from src.ui.shared.theme import HEXVAULT_THEME, ICON_SIZE
 from src.ui.widgets.remote_image import RemoteImage
-from src.usecases.accounts import delete_account
+from src.usecases.accounts import delete_account, update_account_notes
 
 from pyperclip import copy as copy_to_clipboard
 
@@ -174,6 +175,33 @@ class AccountDetailScreen(Screen[bool | None]):
         height: 1fr;
     }
 
+    #detail-notes {
+        width: 1fr;
+        height: 10;
+        border: round $surface-lighten-2;
+        border-title-align: center;
+        border-title-color: $text-muted;
+        padding: 0 0;
+    }
+
+    #detail-notes-editor {
+        height: 7;
+        padding: 0 2;
+    }
+
+    #detail-notes-actions {
+        width: 100%;
+        padding: 0 1;
+    }
+
+    #save-notes {
+        width: 100%;
+    }
+
+    #detail-notes-save-button {
+        width: 1fr;
+    }
+
     .detail-table {
         height: 1fr;
     }
@@ -225,7 +253,17 @@ class AccountDetailScreen(Screen[bool | None]):
                     panel.border_title = "Collection"
                     yield from self._compose_overview_currencies()
                     yield from self._compose_overview_collection()
-            
+
+                with Vertical(classes="section", id="detail-notes") as panel:
+                    panel.border_title = "Notes"
+                    yield TextArea(
+                        self.account.get("notes") or "",
+                        placeholder="Add notes about this account...",
+                        id="detail-notes-editor",
+                    )
+                    with Horizontal(id="detail-notes-actions"):
+                        yield Button("Persist", variant="primary", id="save-notes", classes="detail-notes-save-button", compact=True)
+
             with TabbedContent(initial="champions", classes="section", id="detail-items") as panel:
                 panel.border_title = "Items"
                 panel.border_subtitle = "Table of posessions"
@@ -456,6 +494,9 @@ class AccountDetailScreen(Screen[bool | None]):
                     new=2,
                 )
             return
+        elif event.button.id == "save-notes":
+            self._save_notes()
+            return
         else:
             return
 
@@ -463,6 +504,19 @@ class AccountDetailScreen(Screen[bool | None]):
             return
 
         copy_to_clipboard(copy_value)
+
+    def _save_notes(self) -> None:
+        account_id = self.account.get("id")
+        if not isinstance(account_id, int):
+            return
+
+        notes = self.query_one("#detail-notes-editor", TextArea).text
+        try:
+            self.account = update_account_notes(account_id, notes)
+            self.app._populate_accounts_table()
+            self.notify("Notes saved", title="Account updated", timeout=3)
+        except Exception as error:
+            self.notify(str(error), title="Unable to save notes", severity="error", timeout=5)
 
     def _on_remove_confirmation(self, confirmed: bool | None) -> None:
         if not confirmed:

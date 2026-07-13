@@ -28,6 +28,7 @@ def _account_query():
 def account_to_payload(account: Account) -> dict:
     return {
         "id": account.id,
+        "notes": account.notes,
         "credentials": {
             "login": account.credentials.login,
             "password": account.credentials.password,
@@ -167,6 +168,20 @@ def update_account_credentials(account_id: int, login: str, password: str) -> di
             account.credentials.password = password
         
         session.add(account)
+        session.commit()
+        session.refresh(account)
+        return account_to_payload(account)
+
+
+def update_account_notes(account_id: int, notes: str) -> dict:
+    with get_session() as session:
+        account = session.execute(
+            select(Account).where(Account.id == account_id)
+        ).scalar_one_or_none()
+        if not account:
+            raise LookupError("Account not found")
+
+        account.notes = notes
         session.commit()
         session.refresh(account)
         return account_to_payload(account)

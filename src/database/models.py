@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -15,6 +15,9 @@ class Account(Base):
     __tablename__ = "accounts"
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
+    )
+    notes: Mapped[str] = mapped_column(
+        Text, nullable=False, default=""
     )
     credentials: Mapped["Credentials"] = relationship(
         back_populates="account", cascade="all, delete-orphan", uselist=False
