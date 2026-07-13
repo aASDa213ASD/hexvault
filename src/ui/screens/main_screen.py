@@ -146,11 +146,6 @@ class Hexvault(App):
                     with Vertical(id="posting-tab", classes="section single-panel") as panel:
                         panel.border_title = "League Client"
                         panel.border_subtitle = "LCU API Interface"
-                        yield Static(
-                            self._posting_workspace.status,
-                            id="posting-status",
-                            classes="posting-status",
-                        )
                         with Horizontal(id="posting-actions"):
                             yield Button(
                                 "API Client",

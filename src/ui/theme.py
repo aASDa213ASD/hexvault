@@ -218,7 +218,7 @@ Hexvault {
     border: round $surface-lighten-2;
     border-title-align: center;
     border-title-color: $text-muted;
-    padding: 1 2;
+    padding: 0 1;
 }
 
 .client-status {
@@ -240,14 +240,6 @@ Hexvault {
 
 .single-panel {
     height: 1fr;
-}
-
-.posting-status {
-    width: 1fr;
-    height: 1;
-    margin-bottom: 0;
-    color: $text-muted;
-    text-wrap: wrap;
 }
 
 #posting-tab {

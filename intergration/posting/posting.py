@@ -77,7 +77,7 @@ def run_lcu_posting_foreground() -> None:
     )
 
 
-def refresh_lcu_posting_credentials() -> str:
+def refresh_lcu_posting_credentials() -> None:
     config = get_lcu_process_config()
     LCU_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -92,7 +92,7 @@ def refresh_lcu_posting_credentials() -> str:
             ]),
             encoding="utf-8",
         )
-        return "FATAL: League Client and Riot Client not found, can not send requests to LCU or Riot API"
+        return
 
     league_client = config.league_client
     riot_client = config.riot_client
@@ -114,8 +114,7 @@ def refresh_lcu_posting_credentials() -> str:
     
     if riot_client:
         loaded.append(f"Riot Client {riot_client.base_url}")
-    
-    return "Credentials loaded for " + ", ".join(loaded) + "."
+
 
 
 def _write_launcher() -> None:
