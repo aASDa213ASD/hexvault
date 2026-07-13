@@ -3,7 +3,6 @@ from __future__ import annotations
 import random
 
 from src.datadragon.client import get_rank_icon_url, get_skins_map
-from src.usecases.errors import ValidationError
 
 RANK_TIERS = (
     "UNRANKED",
@@ -50,15 +49,15 @@ def get_random_rank_icon(
     normalized_max = _normalize_tier(max_tier)
 
     if normalized_min not in RANK_TIERS:
-        raise ValidationError(f"Unknown min_tier: {min_tier}")
+        raise ValueError(f"Unknown min_tier: {min_tier}")
     
     if normalized_max not in RANK_TIERS:
-        raise ValidationError(f"Unknown max_tier: {max_tier}")
+        raise ValueError(f"Unknown max_tier: {max_tier}")
 
     min_index = RANK_TIERS.index(normalized_min)
     max_index = RANK_TIERS.index(normalized_max)
     if min_index > max_index:
-        raise ValidationError("min_tier must be lower or equal than max_tier")
+        raise ValueError("min_tier must be lower or equal than max_tier")
 
     available_tiers = RANK_TIERS[min_index : max_index + 1]
     weighted_tiers = []
@@ -68,7 +67,7 @@ def get_random_rank_icon(
         weighted_values.append(DEFAULT_RANK_WEIGHTS.get(tier, 1.0))
 
     if not any(value > 0 for value in weighted_values):
-        raise ValidationError("At least one tier in range must have weight > 0")
+        raise ValueError("At least one tier in range must have weight > 0")
 
     selected_tier = random.choices(weighted_tiers, weights=weighted_values, k=1)[0]
     return {

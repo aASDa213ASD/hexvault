@@ -5,7 +5,6 @@ from sqlalchemy.orm import selectinload
 
 from src.database.connection import get_session
 from src.database.models import Account, Collection, Credentials, Loot, Rank
-from src.usecases.errors import NotFoundError
 
 
 def _account_query():
@@ -135,7 +134,7 @@ def get_account(account_id: int) -> dict:
             _account_query().where(Account.id == account_id)
         ).scalar_one_or_none()
         if not account:
-            raise NotFoundError("Account not found")
+            raise LookupError("Account not found")
         return account_to_payload(account)
 
 
@@ -145,7 +144,7 @@ def update_account_credentials(account_id: int, login: str, password: str) -> di
             select(Account).where(Account.id == account_id)
         ).scalar_one_or_none()
         if not account:
-            raise NotFoundError("Account not found")
+            raise LookupError("Account not found")
         
         if account.credentials is None:
             account.credentials = Credentials(login=login, password=password)
@@ -165,7 +164,7 @@ def delete_account(account_id: int) -> dict:
             select(Account).where(Account.id == account_id)
         ).scalar_one_or_none()
         if not account:
-            raise NotFoundError("Account not found")
+            raise LookupError("Account not found")
         session.delete(account)
         session.commit()
         return {"status": "deleted", "account_id": account_id}

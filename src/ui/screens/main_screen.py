@@ -6,7 +6,7 @@ from pathlib import Path
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.worker import Worker, WorkerState
 from textual.widgets import (
@@ -17,7 +17,6 @@ from textual.widgets import (
     ProgressBar,
     Static,
     TabbedContent,
-    TabPane,
 )
 
 from src.database.connection import init_db
@@ -26,20 +25,23 @@ from intergration.posting.posting import (
     prepare_lcu_posting_workspace,
     run_lcu_posting_foreground,
 )
-from src.ui.privacy import (
+from src.ui.shared.privacy import (
     fake_rank_for_account,
     fake_region_for_summoner,
     fake_username_for_summoner,
 )
-from src.ui.image_cache import prewarm_images
+from src.ui.shared.image_cache import prewarm_images
 from src.ui.screens.account_credentials import AccountCredentialsScreen
 from src.ui.screens.account_detail import AccountDetailScreen
-from src.ui.theme import (
+from src.ui.screens.tabs.accounts import compose_accounts_tab
+from src.ui.screens.tabs.client import compose_client_tab
+from src.ui.screens.tabs.health import compose_health_tab
+from src.ui.screens.tabs.settings import compose_settings_tab
+from src.ui.shared.theme import (
     HEXVAULT_CSS,
     HEXVAULT_THEME,
     ICON_SIZE,
     RANK_COLORS,
-    RANK_ICON_SIZE,
 )
 from src.ui.widgets.remote_image import RemoteImage
 from src.usecases.accounts import list_accounts
@@ -116,186 +118,10 @@ class Hexvault(App):
     def compose(self) -> ComposeResult:
         with Vertical(id="app-root"):
             with TabbedContent(initial="accounts"):
-                with TabPane("Accounts", id="accounts"):
-                    with Horizontal(id="accounts-layout"):
-                        with Vertical(id="accounts-list-panel", classes="section") as panel:
-                            panel.border_title = "Vault"
-                            panel.border_subtitle = "Enter to open the account"
-                            yield DataTable(id="accounts-table")
-                        
-                        with Vertical(id="accounts-sidebar"):
-                            with VerticalScroll(id="selected-account-panel", classes="section") as panel:
-                                panel.border_title = "Selected account"
-                                panel.border_subtitle = "Live preview"
-                                with Horizontal(id="details-hero"):
-                                    with Vertical(id="summoner-panel") as panel:
-                                        panel.border_title = "-"
-                                        yield RemoteImage(
-                                            resize=ICON_SIZE,
-                                            empty_text="No icon available",
-                                            id="account-icon",
-                                        )
-                                    with Vertical(id="rank-panel") as panel:
-                                        panel.border_title = "-"
-                                        with Horizontal(id="rank-row"):
-                                            yield RemoteImage(
-                                                resize=RANK_ICON_SIZE,
-                                                empty_text="",
-                                                id="rank-icon",
-                                            )
-                                with Vertical(id="account-summary"):
-                                    with Horizontal(
-                                        classes="summary-block",
-                                        id="account-meta",
-                                    ) as account_meta:
-                                        account_meta.border_title = "Account"
-                                        with Horizontal(classes="summary-item"):
-                                            yield Static("Region", classes="summary-label")
-                                            yield Static("-", classes="summary-value", id="account-region")
-                                        with Horizontal(classes="summary-item right"):
-                                            yield Static("Level", classes="summary-label")
-                                            yield Static("-", classes="summary-value", id="account-level")
-                                    with Horizontal(
-                                        classes="summary-block",
-                                        id="currency-meta",
-                                    ) as currency_meta:
-                                        currency_meta.border_title = "Currency"
-                                        with Horizontal(classes="summary-item"):
-                                            yield Static("Blue Essence", classes="summary-label")
-                                            yield Static("-", classes="summary-value", id="blue-essence")
-                                        with Horizontal(classes="summary-item right"):
-                                            yield Static("Riot Points", classes="summary-label")
-                                            yield Static("-", classes="summary-value", id="riot-points")
-                                    with Horizontal(
-                                        classes="summary-block",
-                                        id="collection-meta",
-                                    ) as collection_meta:
-                                        collection_meta.border_title = "Collection"
-                                        with Horizontal(classes="summary-item"):
-                                            yield Static("Champions", classes="summary-label")
-                                            yield Static("-", classes="summary-value", id="champions-count")
-                                        with Horizontal(classes="summary-item right"):
-                                            yield Static("Skins", classes="summary-label")
-                                            yield Static("-", classes="summary-value", id="skins-count")
-                            
-                            with Vertical(id="connected-client", classes="section") as panel:
-                                panel.border_title = "Connected client"
-                                with Horizontal(id="client-hero"):
-                                    with Vertical(id="client-icon-panel") as panel:
-                                        yield RemoteImage(
-                                            resize=ICON_SIZE,
-                                            empty_text="No icon",
-                                            id="client-icon",
-                                        )
-                                    with Vertical(id="client-text-panel") as panel:
-                                        yield Static(
-                                            "Not connected",
-                                            id="lcu-status",
-                                            classes="client-status",
-                                        )
-                                        yield Static(
-                                            "",
-                                            id="lcu-sync-status",
-                                            classes="client-sync-status",
-                                        )
-                                
-                                with Horizontal(id="lcu-actions"):
-                                    yield Button(
-                                        "Sync",
-                                        id="lcu-sync",
-                                        classes="client-sync-button",
-                                    )
-                
-                with TabPane("Client", id="lcu"):
-                    with Vertical(id="posting-tab", classes="section single-panel") as panel:
-                        panel.border_title = "League Client"
-                        panel.border_subtitle = "LCU API Interface"
-                        with Horizontal(id="posting-actions"):
-                            yield Button(
-                                "API Client",
-                                id="open-posting-here",
-                                classes="posting-action",
-                            )
-                
-                with TabPane("Settings", id="settings"):
-                    with Vertical(classes="section single-panel") as panel:
-                        panel.border_title = "Privacy"
-                        panel.border_subtitle = "Display controls"
-                        with Vertical(id="settings-options"):
-                            with Horizontal(classes="setting-row") as row:
-                                row.border_title = "Summoner names"
-                                with Vertical(classes="setting-copy"):
-                                    yield Static("Hide names", classes="setting-title")
-                                    yield Static(
-                                        "Replace Riot IDs with fake generated names",
-                                        classes="setting-description",
-                                    )
-                                yield Checkbox(
-                                    id="setting-hide-names",
-                                    compact=True,
-                                    classes="setting-toggle",
-                                )
-                            with Horizontal(classes="setting-row") as row:
-                                row.border_title = "Regions"
-                                with Vertical(classes="setting-copy"):
-                                    yield Static("Hide regions", classes="setting-title")
-                                    yield Static(
-                                        "Show generated server codes instead of real regions",
-                                        classes="setting-description",
-                                    )
-                                yield Checkbox(
-                                    id="setting-hide-regions",
-                                    compact=True,
-                                    classes="setting-toggle",
-                                )
-                            with Horizontal(classes="setting-row") as row:
-                                row.border_title = "Ranks"
-                                with Vertical(classes="setting-copy"):
-                                    yield Static("Randomize ranks", classes="setting-title")
-                                    yield Static(
-                                        "Display deterministic fake ranks to hide the fact that you are low elo",
-                                        classes="setting-description",
-                                    )
-                                yield Checkbox(
-                                    id="setting-randomize-ranks",
-                                    compact=True,
-                                    classes="setting-toggle",
-                                )
-                
-                with TabPane("Health", id="health"):
-                    with VerticalScroll(id="health-tab", classes="section single-panel") as panel:
-                        panel.border_title = "Health"
-                        panel.border_subtitle = "Dependencies"
-                        with Horizontal(id="health-overview"):
-                            with Vertical(id="health-state-panel", classes="health-metric"):
-                                yield Static("System status", classes="health-metric-label")
-                                yield Static("Checking", id="health-overall-state", classes="health-metric-value")
-                            with Vertical(classes="health-metric"):
-                                yield Static("Healthy", classes="health-metric-label")
-                                yield Static("-", id="health-healthy-count", classes="health-metric-value")
-                            with Vertical(classes="health-metric"):
-                                yield Static("Failing", classes="health-metric-label")
-                                yield Static("-", id="health-failing-count", classes="health-metric-value")
-
-                        with Vertical(id="health-checks"):
-                            with Horizontal(id="health-check-db", classes="health-check") as row:
-                                row.border_title = "Database"
-                                with Vertical(classes="health-check-copy"):
-                                    yield Static("SQLite Storage", classes="health-check-title")
-                                    yield Static("-", id="health-detail-db", classes="health-check-detail")
-                                yield Static("-", id="health-state-db", classes="health-check-state")
-                            with Horizontal(id="health-check-lcu", classes="health-check") as row:
-                                row.border_title = "League Client"
-                                with Vertical(classes="health-check-copy"):
-                                    yield Static("LCU Session", classes="health-check-title")
-                                    yield Static("-", id="health-detail-lcu", classes="health-check-detail")
-                                yield Static("-", id="health-state-lcu", classes="health-check-state")
-                            with Horizontal(id="health-check-community-dragon", classes="health-check") as row:
-                                row.border_title = "Community Dragon"
-                                with Vertical(classes="health-check-copy"):
-                                    yield Static("Game assets and data", classes="health-check-title")
-                                    yield Static("-", id="health-detail-community-dragon", classes="health-check-detail")
-                                yield Static("-", id="health-state-community-dragon", classes="health-check-state")
+                yield from compose_accounts_tab()
+                yield from compose_client_tab()
+                yield from compose_settings_tab()
+                yield from compose_health_tab()
         
         yield Footer()
 

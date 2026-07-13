@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.lcu.client import get_lcu_process_config
-from src.ui.theme import HEXVAULT_THEME_COLORS
+from src.ui.shared.theme import HEXVAULT_THEME_COLORS
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]

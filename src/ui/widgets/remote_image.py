@@ -5,7 +5,7 @@ from pathlib import Path
 from rich_pixels import Pixels
 from textual.widget import Widget
 
-from src.ui.image_cache import ensure_cached_image
+from src.ui.shared.image_cache import ensure_cached_image
 
 _PIXELS_CACHE: dict[tuple[str, tuple[int, int] | None], Pixels] = {}
 

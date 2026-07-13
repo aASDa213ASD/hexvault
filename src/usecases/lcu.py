@@ -24,12 +24,6 @@ from src.lcu.client import (
     get_current_account,
     set_current_summoner_icon,
 )
-from src.usecases.errors import (
-    ConflictError,
-    ExternalRequestError,
-    ExternalUnavailableError,
-    ValidationError,
-)
 
 
 def account_summary(account: Account) -> dict:
@@ -83,17 +77,17 @@ def stop_auto_accept() -> dict:
 def get_current_account_from_lcu() -> dict:
     payload = get_current_account()
     if not payload:
-        raise ExternalUnavailableError("League Client not available")
+        raise RuntimeError("League Client not available")
     return payload
 
 
 def clear_challenges() -> dict:
     result = clear_challenges_preferences()
     if not result:
-        raise ExternalUnavailableError("League Client not available")
+        raise RuntimeError("League Client not available")
     
     if not result.get("ok"):
-        raise ExternalRequestError(
+        raise RuntimeError(
             f"Failed to clear challenges preferences (status {result.get('status')})"
         )
     
@@ -102,14 +96,14 @@ def clear_challenges() -> dict:
 
 def set_summoner_icon(icon_id: int) -> dict:
     if icon_id < 0:
-        raise ValidationError("icon_id must be greater than or equal to 0")
+        raise ValueError("icon_id must be greater than or equal to 0")
     
     result = set_current_summoner_icon(icon_id)
     if not result:
-        raise ExternalUnavailableError("League Client not available")
+        raise RuntimeError("League Client not available")
     
     if not result.get("ok"):
-        raise ExternalRequestError(
+        raise RuntimeError(
             f"Failed to set summoner icon (status {result.get('status')})"
         )
     
@@ -119,10 +113,10 @@ def set_summoner_icon(icon_id: int) -> dict:
 def dodge_lobby() -> dict:
     result = dodge_champ_select()
     if not result:
-        raise ExternalUnavailableError("League Client not available")
+        raise RuntimeError("League Client not available")
     
     if not result.get("ok"):
-        raise ExternalRequestError(
+        raise RuntimeError(
             f"Failed to dodge champ select (status {result.get('status')})"
         )
     
@@ -134,7 +128,7 @@ def current_account_exists() -> dict:
     summoner = payload.get("summoner") or {}
     puuid = summoner.get("puuid")
     if not puuid:
-        raise ValidationError("Missing summoner PUUID")
+        raise ValueError("Missing summoner PUUID")
     
     with get_session() as session:
         existing_summoner = session.execute(
@@ -157,7 +151,7 @@ def save_current_account(
     summoner = current.get("summoner") or {}
     puuid = summoner.get("puuid")
     if not puuid:
-        raise ValidationError("Missing summoner PUUID")
+        raise ValueError("Missing summoner PUUID")
 
     with get_session() as session:
         existing_summoner = session.execute(
@@ -169,7 +163,7 @@ def save_current_account(
 
         if existing_account and not overwrite:
             summary = account_summary(existing_account)
-            raise ConflictError("Account already exists", payload={"account": summary})
+            raise RuntimeError(f"Account already exists: {summary}")
 
         if existing_account:
             session.delete(existing_account)
