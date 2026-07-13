@@ -1,5 +1,6 @@
 # Python garbage
 __pycache__/
+.ruff_cache/
 .venv/
 
 # Accounts database, cache

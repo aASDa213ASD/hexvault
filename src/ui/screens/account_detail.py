@@ -181,17 +181,18 @@ class AccountDetailScreen(Screen[bool | None]):
         border: round $surface-lighten-2;
         border-title-align: center;
         border-title-color: $text-muted;
-        padding: 0 0;
+        padding: 0 1;
     }
 
     #detail-notes-editor {
         height: 7;
-        padding: 0 2;
+        padding: 1 2;
+        border: none;
     }
 
     #detail-notes-actions {
         width: 100%;
-        padding: 0 1;
+        padding: 0 0;
     }
 
     #save-notes {
