@@ -142,8 +142,8 @@ def get_lcu_process_config() -> LCUProcessConfig | None:
     return _read_lcu_process_config()
 
 
-def _request(config: LCUConfig, path: str) -> Any:
-    if hasattr(path, "value"):
+def _request(config: LCUConfig, path: str | Endpoint) -> Any:
+    if isinstance(path, Endpoint):
         path = path.value
 
     auth = base64.b64encode(f"riot:{config.password}".encode("utf-8")).decode("ascii")
@@ -163,9 +163,12 @@ def _request(config: LCUConfig, path: str) -> Any:
 
 
 def _request_json(
-    config: LCUConfig, method: str, path: str, payload: dict | None = None
+    config: LCUConfig,
+    method: str,
+    path: str | Endpoint,
+    payload: dict | None = None,
 ) -> tuple[int | None, Any]:
-    if hasattr(path, "value"):
+    if isinstance(path, Endpoint):
         path = path.value
 
     auth = base64.b64encode(f"riot:{config.password}".encode("utf-8")).decode("ascii")

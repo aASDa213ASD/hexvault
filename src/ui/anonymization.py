@@ -25,7 +25,12 @@ _TIER_I_ONLY_RANKS = {"MASTER", "GRANDMASTER", "CHALLENGER"}
 
 
 def _seed_for_summoner(summoner: dict) -> int:
-    seed_source = summoner.get('puuid')
+    seed_source = str(
+        summoner.get("puuid")
+        or summoner.get("summoner_id")
+        or summoner.get("summoner_account_id")
+        or f"{summoner.get('name', '')}#{summoner.get('tag', '')}"
+    )
     return int(hashlib.sha256(seed_source.encode("utf-8")).hexdigest(), 16) % (2**32)
 
 

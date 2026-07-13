@@ -34,8 +34,8 @@ def get_rank_icon_url(tier: str) -> str:
     )
 
 
-def _fetch_json(url: str) -> Any:
-    if hasattr(url, "value"):
+def _fetch_json(url: str | Endpoint) -> Any:
+    if isinstance(url, Endpoint):
         url = url.value
     
     context = ssl._create_unverified_context()

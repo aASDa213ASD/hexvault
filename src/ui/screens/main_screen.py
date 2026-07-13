@@ -238,15 +238,14 @@ class Hexvault(App):
             table.add_row("-", "No accounts found", "-", "-", "-", "-")
             return
 
-        prewarm_images(
-            [
-                summoner.get("icon_url")
-                for account in self._accounts
-                for summoner in [account.get("summoner") or {}]
-                if summoner.get("icon_url")
-            ],
-            resize=ICON_SIZE,
-        )
+        icon_urls: list[str] = []
+        for account in self._accounts:
+            summoner = account.get("summoner") or {}
+            icon_url = summoner.get("icon_url")
+            if isinstance(icon_url, str):
+                icon_urls.append(icon_url)
+
+        prewarm_images(icon_urls, resize=ICON_SIZE)
 
         for account in self._accounts:
             summoner = account.get("summoner") or {}

@@ -464,7 +464,7 @@ class AccountDetailScreen(Screen[bool | None]):
 
         copy_to_clipboard(copy_value)
 
-    def _on_remove_confirmation(self, confirmed: bool) -> None:
+    def _on_remove_confirmation(self, confirmed: bool | None) -> None:
         if not confirmed:
             return
 

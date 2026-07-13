@@ -166,6 +166,7 @@ def _write_runner() -> None:
     RUNNER_PATH.write_text(
         r'''
 from __future__ import annotations
+# pyright: reportMissingImports=false
 
 from pathlib import Path
 
