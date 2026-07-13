@@ -16,7 +16,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from src.ui.anonymization import (
+from src.ui.privacy import (
     fake_rank_for_account,
     fake_region_for_summoner,
     fake_username_for_summoner,
