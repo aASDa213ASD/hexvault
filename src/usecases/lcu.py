@@ -263,6 +263,7 @@ def save_current_account(
                 keys=loot_payload.get("keys", 0),
                 key_fragments=loot_payload.get("key_fragments", 0),
                 chests=loot_payload.get("chests", 0),
+                champion_mastery_chests=loot_payload.get("champion_mastery_chests", 0),
             )
             for shard in loot_payload.get("champion_shards", []):
                 loot.champion_shards.append(

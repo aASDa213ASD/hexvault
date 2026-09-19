@@ -102,6 +102,7 @@ def account_to_payload(account: Account) -> dict:
             "keys": account.loot.keys,
             "key_fragments": account.loot.key_fragments,
             "chests": account.loot.chests,
+            "champion_mastery_chests": account.loot.champion_mastery_chests,
             "champion_shards": [
                 {
                     "type": shard.type,

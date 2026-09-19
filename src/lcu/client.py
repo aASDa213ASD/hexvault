@@ -495,6 +495,7 @@ def _build_loot(config: LCUConfig) -> dict | None:
         "keys": 0,
         "key_fragments": 0,
         "chests": 0,
+        "champion_mastery_chests": 0,
         "champion_shards": [],
         "skin_shards": [],
     }
@@ -508,6 +509,7 @@ def _build_loot(config: LCUConfig) -> dict | None:
             "MATERIAL_key": "keys",
             "MATERIAL_key_fragment": "key_fragments",
             "CHEST_generic": "chests",
+            "CHEST_champion_mastery": "champion_mastery_chests",
         }.get(loot_id)
         if material_field:
             loot[material_field] += shard.get("count", 0)
