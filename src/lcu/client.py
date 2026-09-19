@@ -492,19 +492,50 @@ def _build_loot(config: LCUConfig) -> dict | None:
         "blue_essence": wallet.get("lol_blue_essence", 0),
         "orange_essence": wallet.get("lol_orange_essence", 0),
         "riot_points": wallet.get("RP", 0),
+        "keys": 0,
+        "key_fragments": 0,
+        "chests": 0,
         "champion_shards": [],
         "skin_shards": [],
     }
 
     owned_loot = _request(config, Endpoint.OWNED_LOOT) or []
+    champions_map = get_champions_map()
+    skins_map = get_skins_map()
     for shard in owned_loot:
+        loot_id = shard.get("lootId")
+        material_field = {
+            "MATERIAL_key": "keys",
+            "MATERIAL_key_fragment": "key_fragments",
+            "CHEST_generic": "chests",
+        }.get(loot_id)
+        if material_field:
+            loot[material_field] += shard.get("count", 0)
+            continue
+
         shard_type = shard.get("type")
         if shard_type not in ("CHAMPION_RENTAL", "CHAMPION", "SKIN_RENTAL", "SKIN"):
             continue
 
+        item_id = shard.get("itemId")
+        if item_id is None:
+            item_id = shard.get("storeItemId")
+        if shard_type in ("CHAMPION_RENTAL", "CHAMPION"):
+            try:
+                champion_id = int(item_id)
+            except (TypeError, ValueError):
+                champion_id = item_id
+            meta = champions_map.get(champion_id) or {}
+        else:
+            meta = skins_map.get(str(item_id)) or {}
+
+        name = meta.get("name")
+        if not name:
+            continue
+
         payload = {
             "type": shard_type,
-            "name": shard.get("itemDesc"),
+            "name": name,
             "amount": shard.get("count", 0),
             "disenchant_value": shard.get("disenchantValue", 0),
             "upgrade_essence_value": shard.get("upgradeEssenceValue", 0),

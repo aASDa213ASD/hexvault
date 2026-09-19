@@ -99,6 +99,9 @@ def account_to_payload(account: Account) -> dict:
             "blue_essence": account.loot.blue_essence,
             "orange_essence": account.loot.orange_essence,
             "riot_points": account.loot.riot_points,
+            "keys": account.loot.keys,
+            "key_fragments": account.loot.key_fragments,
+            "chests": account.loot.chests,
             "champion_shards": [
                 {
                     "type": shard.type,

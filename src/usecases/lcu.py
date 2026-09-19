@@ -260,6 +260,9 @@ def save_current_account(
                 blue_essence=loot_payload.get("blue_essence", 0),
                 orange_essence=loot_payload.get("orange_essence", 0),
                 riot_points=loot_payload.get("riot_points", 0),
+                keys=loot_payload.get("keys", 0),
+                key_fragments=loot_payload.get("key_fragments", 0),
+                chests=loot_payload.get("chests", 0),
             )
             for shard in loot_payload.get("champion_shards", []):
                 loot.champion_shards.append(

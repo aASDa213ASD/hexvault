@@ -259,6 +259,9 @@ class Loot(Base):
     riot_points: Mapped[int] = mapped_column(
         Integer
     )
+    keys: Mapped[int] = mapped_column(Integer, default=0)
+    key_fragments: Mapped[int] = mapped_column(Integer, default=0)
+    chests: Mapped[int] = mapped_column(Integer, default=0)
     account_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("accounts.id")
     )

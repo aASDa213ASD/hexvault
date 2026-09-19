@@ -395,6 +395,15 @@ class AccountDetailScreen(Screen[bool | None]):
         skin_shards = loot.get("skin_shards") or []
         
         entries = [("Champion", shard) for shard in champion_shards] + [("Skin", shard) for shard in skin_shards]
+        materials = (
+            ("MATERIAL", "Hextech Key", loot.get("keys", 0)),
+            ("MATERIAL", "Key Fragment", loot.get("key_fragments", 0)),
+            ("CHEST", "Hextech Chest", loot.get("chests", 0)),
+        )
+        entries.extend(
+            (kind, {"type": kind, "name": name, "amount": amount})
+            for kind, name, amount in materials
+        )
         if not entries:
             table.add_row("No loot", "-", "-", "-")
             return
