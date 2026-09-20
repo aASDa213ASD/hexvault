@@ -18,6 +18,9 @@ from textual.widgets import (
     ProgressBar,
     Static,
     TabbedContent,
+    Input,
+    TextArea,
+    Select,
 )
 
 from src.database.connection import init_db
@@ -38,6 +41,7 @@ from src.ui.screens.tabs.accounts import compose_accounts_tab
 from src.ui.screens.tabs.client import compose_client_tab
 from src.ui.screens.tabs.health import compose_health_tab
 from src.ui.screens.tabs.settings import compose_settings_tab
+from src.ui.screens.tabs.search import compose_search_tab
 from src.ui.shared.theme import (
     HEXVAULT_CSS,
     HEXVAULT_THEME,
@@ -46,6 +50,7 @@ from src.ui.shared.theme import (
 )
 from src.ui.widgets.remote_image import RemoteImage
 from src.usecases.accounts import list_accounts
+from src.usecases.search import search_accounts
 from src.usecases.health import health
 from src.usecases.lcu import (
     current_account_exists,
@@ -121,6 +126,7 @@ class Hexvault(App):
         with Vertical(id="app-root"):
             with TabbedContent(initial="accounts"):
                 yield from compose_accounts_tab()
+                yield from compose_search_tab()
                 yield from compose_client_tab()
                 yield from compose_settings_tab()
                 yield from compose_health_tab()
@@ -132,7 +138,9 @@ class Hexvault(App):
         self.theme = "hexvault"
         init_db()
         self._accounts: list[dict] = []
+        self._search_results: list[dict] = []
         self._populate_accounts_table()
+        self._populate_search_results([])
         self._populate_lcu_status()
         self.set_interval(60, self._update_decay_countdowns, name="decay-countdown")
 
@@ -350,18 +358,23 @@ class Hexvault(App):
         return fallback_path if fallback_path.exists() else None
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        if event.data_table.id != "accounts-table":
+            return
         if event.cursor_row < 0 or event.cursor_row >= len(self._accounts):
             return
         
         self._show_account_details(self._accounts[event.cursor_row])
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        if event.cursor_row < 0 or event.cursor_row >= len(self._accounts):
+        accounts = self._search_results if event.data_table.id == "search-results" else self._accounts
+        if event.data_table.id not in {"accounts-table", "search-results"}:
+            return
+        if event.cursor_row < 0 or event.cursor_row >= len(accounts):
             return
         
         self.push_screen(
             AccountDetailScreen(
-                self._accounts[event.cursor_row],
+                accounts[event.cursor_row],
                 hide_names=self._is_hide_names_enabled(),
                 hide_regions=self._is_hide_regions_enabled(),
                 randomize_ranks=self._is_randomize_ranks_enabled(),
@@ -420,6 +433,14 @@ class Hexvault(App):
         self.query_one("#lcu-sync-status", Static).update(message)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "search-submit":
+            self._run_search()
+            return
+
+        if event.button.id == "search-clear":
+            self._clear_search()
+            return
+
         if event.button.id == "open-posting-here":
             with self.suspend():
                 run_lcu_posting_foreground()
@@ -429,6 +450,72 @@ class Hexvault(App):
             return
         
         self._start_sync_current_account()
+
+    def _run_search(self) -> None:
+        filters = {
+            "region": self.query_one("#search-region", Input).value,
+            "level_min": self.query_one("#search-level-min", Input).value,
+            "level_max": self.query_one("#search-level-max", Input).value,
+            "rank_min": self._search_select_value("#search-rank-min"),
+            "rank_max": self._search_select_value("#search-rank-max"),
+            "champions": self.query_one("#search-champions", Input).value,
+            "skins": self.query_one("#search-skins", Input).value,
+            "blue_essence_min": self.query_one("#search-be-min", Input).value,
+            "riot_points_min": self.query_one("#search-rp-min", Input).value,
+            "champion_shards": self.query_one("#search-champion-shards", Input).value,
+            "skin_shards": self.query_one("#search-skin-shards", Input).value,
+            "advanced": self.query_one("#search-advanced", TextArea).text,
+        }
+        try:
+            results = search_accounts(filters)
+        except ValueError as exc:
+            self.query_one("#search-status", Static).update(f"Error: {exc}")
+            return
+        self._populate_search_results(results)
+        self.query_one("#search-status", Static).update(f"{len(results)} account(s) found")
+
+    def _populate_search_results(self, accounts: list[dict]) -> None:
+        self._search_results = accounts
+        table = self.query_one("#search-results", DataTable)
+        table.clear(columns=True)
+        table.cursor_type = "row"
+        table.add_columns("ID", "Summoner", "Region", "Level", "Rank", "Blue Essence", "Champions", "Skins")
+        if not accounts:
+            table.add_row("-", "No matching accounts", "-", "-", "-", "-", "-", "-")
+            return
+        for account in accounts:
+            summoner = account.get("summoner") or {}
+            loot = account.get("loot") or {}
+            collection = account.get("collection") or {}
+            ranked_queues = (account.get("rank") or {}).get("ranked_queues") or []
+            primary_queue = ranked_queues[0] if ranked_queues else {}
+            rank_tier = primary_queue.get("tier") or "Unranked"
+            rank_label = rank_tier
+            if primary_queue.get("division"):
+                rank_label = f"{rank_label} {primary_queue['division']}"
+            table.add_row(
+                str(account.get("id") or "-"),
+                self._format_summoner_name(summoner),
+                self._format_region(summoner),
+                str(summoner.get("level") or "-"),
+                Text(rank_label, style=RANK_COLORS.get(rank_tier, "")),
+                str(loot.get("blue_essence") or 0),
+                str(len(collection.get("champions") or [])),
+                str(len(collection.get("skins") or [])),
+            )
+
+    def _clear_search(self) -> None:
+        for input_widget in self.query("#search-filters Input"):
+            input_widget.value = ""
+        self.query_one("#search-rank-min", Select).value = Select.NULL
+        self.query_one("#search-rank-max", Select).value = Select.NULL
+        self.query_one("#search-advanced", TextArea).load_text("")
+        self.query_one("#search-status", Static).update("")
+        self._populate_search_results([])
+
+    def _search_select_value(self, selector: str) -> str:
+        value = self.query_one(selector, Select).value
+        return value if isinstance(value, str) else ""
 
     def _start_sync_current_account(self) -> None:
         if self._active_sync_worker and not self._active_sync_worker.is_finished:

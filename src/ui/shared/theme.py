@@ -304,6 +304,60 @@ Hexvault {
     padding: 1 2;
 }
 
+#search-layout {
+    height: 1fr;
+}
+
+#search-filters {
+    width: 3fr;
+    min-width: 58;
+    margin-right: 1;
+}
+
+#search-results-panel {
+    width: 4fr;
+    height: 1fr;
+}
+
+#search-results {
+    height: 1fr;
+}
+
+.search-heading {
+    margin-top: 1;
+    color: $foreground;
+    text-style: bold;
+}
+
+.search-copy {
+    padding-left: 1;
+}
+
+.search-row {
+    height: 3;
+}
+
+.search-row Input {
+    width: 1fr;
+}
+
+.search-row Select {
+    width: 1fr;
+}
+
+#search-advanced {
+    height: 6;
+}
+
+#search-actions {
+    height: 3;
+    margin-top: 1;
+}
+
+#search-actions Button {
+    width: 1fr;
+}
+
 #health-overview {
     width: 1fr;
     height: auto;
