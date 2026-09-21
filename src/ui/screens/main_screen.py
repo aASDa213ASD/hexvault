@@ -9,6 +9,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
+from textual.theme import BUILTIN_THEMES, Theme
 from textual.worker import Worker, WorkerState
 from textual.widgets import (
     Button,
@@ -28,6 +29,7 @@ from src.lcu.client import get_current_summoner
 from intergration.posting.posting import (
     prepare_lcu_posting_workspace,
     run_lcu_posting_foreground,
+    sync_lcu_posting_theme,
 )
 from src.ui.shared.privacy import (
     fake_rank_for_account,
@@ -44,10 +46,11 @@ from src.ui.screens.tabs.settings import compose_settings_tab
 from src.ui.screens.tabs.search import compose_search_tab
 from src.ui.shared.theme import (
     HEXVAULT_CSS,
-    HEXVAULT_THEME,
     ICON_SIZE,
     RANK_COLORS,
+    THEMES,
 )
+from src.ui.shared.settings import load_theme_name, save_theme_name
 from src.ui.widgets.remote_image import RemoteImage
 from src.usecases.accounts import list_accounts
 from src.usecases.search import search_accounts
@@ -115,7 +118,8 @@ class Hexvault(App):
     CSS = HEXVAULT_CSS
 
     def __init__(self) -> None:
-        self._posting_workspace = prepare_lcu_posting_workspace()
+        self._theme_name = load_theme_name()
+        self._posting_workspace = prepare_lcu_posting_workspace(self._theme_name)
         self._active_sync_worker: Worker[SyncResult] | None = None
         self._active_health_worker: Worker[dict] | None = None
         self._decay_deadlines: dict[str, datetime] = {}
@@ -128,14 +132,22 @@ class Hexvault(App):
                 yield from compose_accounts_tab()
                 yield from compose_search_tab()
                 yield from compose_client_tab()
-                yield from compose_settings_tab()
+                yield from compose_settings_tab(self._theme_name)
                 yield from compose_health_tab()
         
         yield Footer()
 
     def on_mount(self) -> None:
-        self.register_theme(HEXVAULT_THEME)
-        self.theme = "hexvault"
+        for theme_name in BUILTIN_THEMES:
+            self.unregister_theme(theme_name)
+        for theme in THEMES.values():
+            self.register_theme(theme)
+        self.theme = self._theme_name
+        self.theme_changed_signal.subscribe(
+            self,
+            self._persist_theme,
+            immediate=True,
+        )
         init_db()
         self._accounts: list[dict] = []
         self._search_results: list[dict] = []
@@ -399,6 +411,26 @@ class Hexvault(App):
         if 0 <= selected_row < len(self._accounts):
             self._show_account_details(self._accounts[selected_row])
 
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id != "setting-theme" or not isinstance(event.value, str):
+            return
+        if event.value not in THEMES or event.value == self._theme_name:
+            return
+
+        self._theme_name = event.value
+        self.theme = event.value
+
+    def _persist_theme(self, theme: Theme) -> None:
+        if theme.name not in THEMES:
+            return
+
+        self._theme_name = theme.name
+        save_theme_name(theme.name)
+        sync_lcu_posting_theme(theme.name)
+        theme_select = self.query_one("#setting-theme", Select)
+        if theme_select.value != theme.name:
+            theme_select.value = theme.name
+
     def on_tabbed_content_tab_activated(
         self,
         event: TabbedContent.TabActivated,
@@ -443,7 +475,7 @@ class Hexvault(App):
 
         if event.button.id == "open-posting-here":
             with self.suspend():
-                run_lcu_posting_foreground()
+                run_lcu_posting_foreground(self._theme_name)
             return
 
         if event.button.id != "lcu-sync":

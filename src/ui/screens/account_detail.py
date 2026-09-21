@@ -22,7 +22,7 @@ from src.ui.shared.privacy import (
     fake_region_for_summoner,
     fake_username_for_summoner,
 )
-from src.ui.shared.theme import HEXVAULT_THEME, ICON_SIZE
+from src.ui.shared.theme import ICON_SIZE
 from src.ui.widgets.remote_image import RemoteImage
 from src.usecases.accounts import delete_account, update_account_notes
 
@@ -292,8 +292,6 @@ class AccountDetailScreen(Screen[bool | None]):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.app.register_theme(HEXVAULT_THEME)
-        self.app.theme = "hexvault"
         self._populate_champions_table()
         self._populate_skins_table()
         self._populate_loot_table()

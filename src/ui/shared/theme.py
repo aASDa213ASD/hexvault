@@ -6,17 +6,55 @@ from textual.theme import Theme
 ICON_SIZE = (16, 16)
 CLIENT_ICON_SIZE = (8, 8)
 RANK_ICON_SIZE = (16, 16)
-HEXVAULT_THEME_COLORS = {
-    "primary": "#F4F1EA",
-    "secondary": "#89B4FA",
-    "accent": "#E6C384",
-    "foreground": "#D7D3C8",
-    "background": "#101014",
-    "surface": "#181820",
-    "panel": "#22222C",
-    "success": "#A6D189",
-    "warning": "#E6C384",
-    "error": "#E78284",
+MONOCHROME_THEME_COLORS = {
+    "primary": "#F5F5F5",
+    "secondary": "#A3A3A3",
+    "accent": "#D4D4D4",
+    "foreground": "#E5E5E5",
+    "background": "#090909",
+    "surface": "#141414",
+    "panel": "#202020",
+    "success": "#B5D6A7",
+    "warning": "#D6C68A",
+    "error": "#D98B8B",
+}
+CS16_THEME_COLORS = {
+    "primary": "#C4B550",
+    "secondary": "#8F8B72",
+    "accent": "#D6CFAF",
+    "foreground": "#DEDFD6",
+    "background": "#171914",
+    "surface": "#20231B",
+    "panel": "#3E4637",
+    "success": "#A0AA95",
+    "warning": "#C4B550",
+    "error": "#B85C4A",
+}
+ROSE_THEME_COLORS = {
+    "primary": "#FF6B6B",
+    "secondary": "#D94C5A",
+    "accent": "#FCA5A5",
+    "foreground": "#F3E8E8",
+    "background": "#070506",
+    "surface": "#100A0C",
+    "panel": "#190F13",
+    "success": "#86EFAC",
+    "warning": "#FBBF24",
+    "error": "#F43F5E",
+}
+ZEN_THEME_COLORS = {
+    "primary": "#D7C9A9",
+    "secondary": "#7E9482",
+    "accent": "#B88A5A",
+    "foreground": "#DDD8CA",
+
+    "background": "#0B0B0A",
+    "surface": "#131311",
+    "panel": "#1C1C18",
+
+    "success": "#819A78",
+    "warning": "#C29B5B",
+    "error": "#A95F58",
 }
 RANK_COLORS = {
     "Unranked": "#999999",
@@ -33,27 +71,43 @@ RANK_COLORS = {
     "BE": "#B2DCFF",
 }
 
-HEXVAULT_THEME = Theme(
-    name="hexvault",
-    primary=HEXVAULT_THEME_COLORS["primary"],
-    secondary=HEXVAULT_THEME_COLORS["secondary"],
-    accent=HEXVAULT_THEME_COLORS["accent"],
-    foreground=HEXVAULT_THEME_COLORS["foreground"],
-    background=HEXVAULT_THEME_COLORS["background"],
-    surface=HEXVAULT_THEME_COLORS["surface"],
-    panel=HEXVAULT_THEME_COLORS["panel"],
-    success=HEXVAULT_THEME_COLORS["success"],
-    warning=HEXVAULT_THEME_COLORS["warning"],
-    error=HEXVAULT_THEME_COLORS["error"],
-    dark=True,
-    variables={
-        "block-cursor-text-style": "bold",
-        "footer-key-foreground": "#89B4FA",
-        "footer-key-background": "#181820",
-        "footer-description-foreground": "#9A968E",
-        "input-selection-background": "#89B4FA 28%",
-    },
-)
+THEME_COLORS = {
+    "monochrome": MONOCHROME_THEME_COLORS,
+    "cs16": CS16_THEME_COLORS,
+    "rose": ROSE_THEME_COLORS,
+    "zen": ZEN_THEME_COLORS,
+}
+DEFAULT_THEME_NAME = "monochrome"
+
+
+def _make_theme(name: str, colors: dict[str, str]) -> Theme:
+    return Theme(
+        name=name,
+        primary=colors["primary"],
+        secondary=colors["secondary"],
+        accent=colors["accent"],
+        foreground=colors["foreground"],
+        background=colors["background"],
+        surface=colors["surface"],
+        panel=colors["panel"],
+        success=colors["success"],
+        warning=colors["warning"],
+        error=colors["error"],
+        dark=True,
+        variables={
+            "block-cursor-text-style": "bold",
+            "footer-key-foreground": colors["primary"],
+            "footer-key-background": colors["surface"],
+            "footer-description-foreground": colors["secondary"],
+            "input-selection-background": f'{colors["primary"]} 28%',
+        },
+    )
+
+
+THEMES = {
+    name: _make_theme(name, colors)
+    for name, colors in THEME_COLORS.items()
+}
 
 HEXVAULT_CSS = """
 Hexvault {
@@ -297,6 +351,11 @@ Hexvault {
     width: 5;
     height: 1;
     margin-top: 1;
+    margin-left: 1;
+}
+
+.setting-select {
+    width: 20;
     margin-left: 1;
 }
 

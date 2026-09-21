@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Checkbox, Static, TabPane
+from textual.widgets import Checkbox, Select, Static, TabPane
 
 
-def compose_settings_tab() -> ComposeResult:
+def compose_settings_tab(theme_name: str) -> ComposeResult:
     with TabPane("Settings", id="settings"):
         with Vertical(classes="section single-panel") as panel:
-            panel.border_title = "Privacy"
+            panel.border_title = "Preferences"
             panel.border_subtitle = "Display controls"
             with Vertical(id="settings-options"):
                 with Horizontal(classes="setting-row") as row:
@@ -50,4 +50,23 @@ def compose_settings_tab() -> ComposeResult:
                         compact=True,
                         classes="setting-toggle",
                     )
-
+                with Horizontal(classes="setting-row") as row:
+                    row.border_title = "Appearance"
+                    with Vertical(classes="setting-copy"):
+                        yield Static("Theme", classes="setting-title")
+                        yield Static(
+                            "Apply the same theme to Hexvault and Posting",
+                            classes="setting-description",
+                        )
+                    yield Select(
+                        (
+                            ("Monochrome", "monochrome"),
+                            ("CS 1.6", "cs16"),
+                            ("Rose", "rose"),
+                            ("Zen", "zen"),
+                        ),
+                        value=theme_name,
+                        allow_blank=False,
+                        id="setting-theme",
+                        classes="setting-select",
+                    )

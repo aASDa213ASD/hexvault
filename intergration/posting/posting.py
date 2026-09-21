@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.lcu.client import get_lcu_process_config
-from src.ui.shared.theme import HEXVAULT_THEME_COLORS
+from src.ui.shared.theme import DEFAULT_THEME_NAME, THEME_COLORS
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -18,7 +18,7 @@ COLLECTION_DIR = LCU_DIR / "collection"
 ENV_PATH = LCU_DIR / "lcu.env"
 CONFIG_PATH = LCU_DIR / "posting-config.yaml"
 THEMES_DIR = LCU_DIR / "themes"
-THEME_PATH = THEMES_DIR / "hexvault.yaml"
+LEGACY_THEME_PATH = THEMES_DIR / "hexvault.yaml"
 RUNNER_PATH = LCU_DIR / "run-posting.py"
 RUNTIME_DIR = POSTING_DIR / "runtime"
 RUNTIME_PYTHON = RUNTIME_DIR / "Scripts" / "python.exe"
@@ -38,10 +38,12 @@ class LcuPostingWorkspace:
     runtime_path: Path
 
 
-def prepare_lcu_posting_workspace() -> LcuPostingWorkspace:
+def prepare_lcu_posting_workspace(
+    theme_name: str = DEFAULT_THEME_NAME,
+) -> LcuPostingWorkspace:
     status = refresh_lcu_posting_credentials()
     _write_collection()
-    _write_theme_files()
+    theme_path = _write_theme_files(theme_name)
     _write_runner()
     _write_launcher()
     return LcuPostingWorkspace(
@@ -49,24 +51,32 @@ def prepare_lcu_posting_workspace() -> LcuPostingWorkspace:
         collection_path=COLLECTION_DIR,
         env_path=ENV_PATH,
         config_path=CONFIG_PATH,
-        theme_path=THEME_PATH,
+        theme_path=theme_path,
         runner_path=RUNNER_PATH,
         launcher_path=LAUNCHER_PATH,
         runtime_path=RUNTIME_DIR,
     )
 
 
-def refresh_lcu_posting_workspace() -> str:
+def refresh_lcu_posting_workspace(
+    theme_name: str = DEFAULT_THEME_NAME,
+) -> str:
     status = refresh_lcu_posting_credentials()
     _write_collection()
-    _write_theme_files()
+    _write_theme_files(theme_name)
     _write_runner()
     _write_launcher()
     return status
 
 
-def run_lcu_posting_foreground() -> None:
-    workspace = prepare_lcu_posting_workspace()
+def sync_lcu_posting_theme(theme_name: str) -> None:
+    _write_theme_files(theme_name)
+
+
+def run_lcu_posting_foreground(
+    theme_name: str = DEFAULT_THEME_NAME,
+) -> None:
+    workspace = prepare_lcu_posting_workspace(theme_name)
     env = os.environ.copy()
     env["HEXVAULT_PYTHON"] = sys.executable
     subprocess.run(
@@ -337,6 +347,10 @@ class HexvaultPosting(Posting):
     }
     """
 
+    def on_mount(self) -> None:
+        super().on_mount()
+        self.unregister_theme("galaxy")
+
     def get_default_screen(self) -> HexvaultPostingScreen:
         self.main_screen = HexvaultPostingScreen(
             collection=self.collection,
@@ -366,15 +380,18 @@ if __name__ == "__main__":
     )
 
 
-def _write_theme_files() -> None:
+def _write_theme_files(theme_name: str) -> Path:
+    if theme_name not in THEME_COLORS:
+        theme_name = DEFAULT_THEME_NAME
+
     THEMES_DIR.mkdir(parents=True, exist_ok=True)
     theme_directory = _relative_to_root(THEMES_DIR)
     CONFIG_PATH.write_text(
         "\n".join([
-            "theme: hexvault",
+            f"theme: {theme_name}",
             f'theme_directory: "{theme_directory}"',
             "load_user_themes: true",
-            "load_builtin_themes: true",
+            "load_builtin_themes: false",
             "spacing: standard",
             "heading:",
             "  visible: false",
@@ -387,41 +404,46 @@ def _write_theme_files() -> None:
         ]),
         encoding="utf-8",
     )
-    THEME_PATH.write_text(
-        "\n".join([
-            "name: hexvault",
-            f"primary: '{HEXVAULT_THEME_COLORS['primary']}'",
-            f"secondary: '{HEXVAULT_THEME_COLORS['secondary']}'",
-            f"accent: '{HEXVAULT_THEME_COLORS['accent']}'",
-            f"background: '{HEXVAULT_THEME_COLORS['background']}'",
-            f"surface: '{HEXVAULT_THEME_COLORS['surface']}'",
-            f"panel: '{HEXVAULT_THEME_COLORS['panel']}'",
-            f"warning: '{HEXVAULT_THEME_COLORS['warning']}'",
-            f"error: '{HEXVAULT_THEME_COLORS['error']}'",
-            f"success: '{HEXVAULT_THEME_COLORS['success']}'",
-            "dark: true",
-            "text_area:",
-            "  gutter: 'dim'",
-            f"  cursor: 'reverse {HEXVAULT_THEME_COLORS['primary']}'",
-            f"  cursor_line: 'on {HEXVAULT_THEME_COLORS['surface']}'",
-            f"  selection: 'on {HEXVAULT_THEME_COLORS['secondary']}'",
-            "syntax:",
-            f"  json_key: '{HEXVAULT_THEME_COLORS['primary']}'",
-            f"  json_string: '{HEXVAULT_THEME_COLORS['success']}'",
-            f"  json_number: '{HEXVAULT_THEME_COLORS['warning']}'",
-            f"  json_boolean: '{HEXVAULT_THEME_COLORS['secondary']}'",
-            f"  json_null: '{HEXVAULT_THEME_COLORS['error']}'",
-            "url:",
-            f"  base: '{HEXVAULT_THEME_COLORS['secondary']}'",
-            f"  protocol: 'bold {HEXVAULT_THEME_COLORS['accent']}'",
-            "  separator: 'dim'",
-            "variable:",
-            f"  resolved: '{HEXVAULT_THEME_COLORS['success']}'",
-            f"  unresolved: '{HEXVAULT_THEME_COLORS['error']}'",
-            "",
-        ]),
-        encoding="utf-8",
-    )
+    LEGACY_THEME_PATH.unlink(missing_ok=True)
+    for name, colors in THEME_COLORS.items():
+        theme_path = THEMES_DIR / f"{name}.yaml"
+        theme_path.write_text(
+            "\n".join([
+                f"name: {name}",
+                f"primary: '{colors['primary']}'",
+                f"secondary: '{colors['secondary']}'",
+                f"accent: '{colors['accent']}'",
+                f"foreground: '{colors['foreground']}'",
+                f"background: '{colors['background']}'",
+                f"surface: '{colors['surface']}'",
+                f"panel: '{colors['panel']}'",
+                f"warning: '{colors['warning']}'",
+                f"error: '{colors['error']}'",
+                f"success: '{colors['success']}'",
+                "dark: true",
+                "text_area:",
+                "  gutter: 'dim'",
+                f"  cursor: 'reverse {colors['primary']}'",
+                f"  cursor_line: 'on {colors['surface']}'",
+                f"  selection: 'on {colors['secondary']}'",
+                "syntax:",
+                f"  json_key: '{colors['primary']}'",
+                f"  json_string: '{colors['success']}'",
+                f"  json_number: '{colors['warning']}'",
+                f"  json_boolean: '{colors['secondary']}'",
+                f"  json_null: '{colors['error']}'",
+                "url:",
+                f"  base: '{colors['secondary']}'",
+                f"  protocol: 'bold {colors['accent']}'",
+                "  separator: 'dim'",
+                "variable:",
+                f"  resolved: '{colors['success']}'",
+                f"  unresolved: '{colors['error']}'",
+                "",
+            ]),
+            encoding="utf-8",
+        )
+    return THEMES_DIR / f"{theme_name}.yaml"
 
 
 def _write_collection() -> None:
